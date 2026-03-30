@@ -84,7 +84,7 @@ export default function DashboardPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="font-display text-3xl font-extrabold">
+          <h1 className="font-display text-2xl md:text-3xl font-extrabold">
             Hey, <span className="text-gold">{user.name}</span> 👋
           </h1>
           <p className="text-muted-foreground text-sm mt-1">{todayStr}</p>

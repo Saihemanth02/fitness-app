@@ -168,10 +168,10 @@ export default function CoachPage() {
 
   return (
     <div className="animate-fade-in h-full">
-      <h1 className="font-display text-3xl font-extrabold mb-2">AI Coach <span className="text-gold">🤖</span></h1>
-      <p className="text-muted-foreground text-sm mb-6">Your personal fitness AI, powered by your real data</p>
+      <h1 className="font-display text-2xl md:text-3xl font-extrabold mb-2">AI Coach <span className="text-gold">🤖</span></h1>
+      <p className="text-muted-foreground text-sm mb-4 md:mb-6">Your personal fitness AI, powered by your real data</p>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 h-[calc(100vh-220px)]">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4 md:gap-6 h-[calc(100vh-240px)] md:h-[calc(100vh-220px)]">
         {/* Chat */}
         <div className="glass-card flex flex-col overflow-hidden">
           <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-4">

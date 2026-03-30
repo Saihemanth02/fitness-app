@@ -45,7 +45,7 @@ export default function ProfilePage() {
 
   return (
     <div className="animate-fade-in">
-      <h1 className="font-display text-3xl font-extrabold mb-2">Profile <span className="text-gold">👤</span></h1>
+      <h1 className="font-display text-2xl md:text-3xl font-extrabold mb-2">Profile <span className="text-gold">👤</span></h1>
       <p className="text-muted-foreground text-sm mb-8">Manage your profile and track achievements</p>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
