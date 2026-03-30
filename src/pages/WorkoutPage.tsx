@@ -95,8 +95,8 @@ export default function WorkoutPage() {
 
       {/* Workout Modal */}
       {activeWorkout && (
-        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="glass-card w-full max-w-lg p-8 relative">
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-end md:items-center justify-center p-0 md:p-4">
+          <div className="glass-card w-full md:max-w-lg p-6 md:p-8 relative rounded-t-3xl md:rounded-2xl max-h-[90vh] overflow-y-auto">
             <button onClick={() => { setActiveWorkout(null); setIsRunning(false); if (timerRef.current) clearInterval(timerRef.current); }}
               className="absolute top-4 right-4 text-muted-foreground hover:text-foreground">
               <X size={20} />
