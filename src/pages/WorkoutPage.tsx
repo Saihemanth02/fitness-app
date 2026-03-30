@@ -97,6 +97,7 @@ export default function WorkoutPage() {
                 </div>
               ))}
             </div>
+            </div>
           </div>
         </div>
       )}
