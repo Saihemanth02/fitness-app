@@ -76,7 +76,7 @@ export default function WorkoutPage() {
       <h1 className="font-display text-2xl md:text-3xl font-extrabold mb-2">Workouts <span className="text-gold">🏋️</span></h1>
       <p className="text-muted-foreground text-sm mb-8">7-minute high-intensity workouts designed for results</p>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
         {workouts.map(w => (
           <button key={w.id} onClick={() => openWorkout(w)} className="glass-card-hover p-6 text-left">
             <div className="text-4xl mb-3">{w.emoji}</div>
