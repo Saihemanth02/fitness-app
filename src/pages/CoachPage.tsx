@@ -111,6 +111,7 @@ export default function CoachPage() {
             const parsed = JSON.parse(jsonStr);
             const content = parsed.choices?.[0]?.delta?.content as string | undefined;
             if (content) {
+              if (!assistantSoFar) setIsStreaming(true);
               assistantSoFar += content;
               const currentContent = assistantSoFar;
               setMessages(prev => {
