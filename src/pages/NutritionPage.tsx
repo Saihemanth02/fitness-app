@@ -129,15 +129,16 @@ export default function NutritionPage() {
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     const file = e.dataTransfer.files?.[0];
     if (file && file.type.startsWith('image/')) {
-      // Create a synthetic event-like object to reuse handleFileSelect logic
-      const dt = new DataTransfer();
-      dt.items.add(file);
-      if (fileInputRef.current) {
-        fileInputRef.current.files = dt.files;
-      }
-      handleFileSelect({ target: { files: dt.files } } as unknown as React.ChangeEvent<HTMLInputElement>);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64 = (reader.result as string).split(',')[1];
+        setPreviewUrl(reader.result as string);
+        analyzeImage(base64);
+      };
+      reader.readAsDataURL(file);
     }
   };
 
