@@ -184,7 +184,7 @@ export default function CoachPage() {
                 </div>
               </div>
             ))}
-            {isLoading && assistantSoFar === '' && (
+            {isLoading && !isStreaming && (
               <div className="flex justify-start">
                 <div className="bg-secondary p-4 rounded-2xl rounded-bl-md">
                   <div className="flex gap-1.5">
