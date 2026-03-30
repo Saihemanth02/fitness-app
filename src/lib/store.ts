@@ -152,4 +152,16 @@ export const store = {
     store.setBadges(b);
     return true;
   },
+
+  getWeightHistory: (): { date: string; weight: number }[] => {
+    return load('fitgenius_weight_history', []);
+  },
+  addWeightEntry: (weight: number) => {
+    const history = load<{ date: string; weight: number }[]>('fitgenius_weight_history', []);
+    const t = today();
+    const idx = history.findIndex(h => h.date === t);
+    if (idx >= 0) history[idx].weight = weight;
+    else history.push({ date: t, weight });
+    save('fitgenius_weight_history', history);
+  },
 };
