@@ -129,12 +129,13 @@ export default function NutritionPage() {
     e.preventDefault();
     const file = e.dataTransfer.files?.[0];
     if (file && file.type.startsWith('image/')) {
+      // Create a synthetic event-like object to reuse handleFileSelect logic
       const dt = new DataTransfer();
       dt.items.add(file);
       if (fileInputRef.current) {
         fileInputRef.current.files = dt.files;
-        fileInputRef.current.dispatchEvent(new Event('change', { bubbles: true }));
       }
+      handleFileSelect({ target: { files: dt.files } } as unknown as React.ChangeEvent<HTMLInputElement>);
     }
   };
 
