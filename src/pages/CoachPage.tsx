@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { store } from '@/lib/store';
 import { Send, Brain } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -14,6 +15,8 @@ const mlModels = [
   { name: 'RL Plan Adapt', arch: 'Policy Gradient', acc: 'Ep.247', status: 'Training' },
   { name: 'BERT Food NLP', arch: 'Fine-tuned', acc: 'F1=0.89', status: 'Active' },
 ];
+
+const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fitness-coach`;
 
 export default function CoachPage() {
   const [messages, setMessages] = useState<Message[]>([
@@ -36,25 +39,126 @@ export default function CoachPage() {
 
   const sendMessage = async (text?: string) => {
     const msgText = text || input.trim();
-    if (!msgText) return;
+    if (!msgText || isLoading) return;
     setInput('');
     const userMsg: Message = { role: 'user', content: msgText };
-    setMessages(prev => [...prev, userMsg]);
+    const updatedMessages = [...messages, userMsg];
+    setMessages(updatedMessages);
     setIsLoading(true);
 
-    // Simulate AI response (Claude API would go here)
-    setTimeout(() => {
-      const responses = [
-        `Great question, ${user.name}! Based on your ${streak.count}-day streak and ${totalCals} kcal intake today, you're ${totalCals < 1800 ? 'in a good caloric range. Keep it up!' : 'slightly above target. Consider a lighter dinner.'} 💪`,
-        `${user.name}, your consistency is impressive with a ${streak.count}-day streak! For your ${user.goal.toLowerCase()} goal, try adding 10 min of walking after meals to boost metabolism. Your ${totalCals} kcal today looks ${totalCals < 2000 ? 'well-managed' : 'a bit high'}.`,
-        `Looking at your data, ${user.name} — ${totalCals} kcal consumed today with a ${streak.count}-day streak. ${user.goal === 'Fat Loss' ? 'Stay in a 300-500 kcal deficit for steady progress.' : 'Make sure you hit your protein target for optimal results.'} Keep pushing! 🔥`,
-      ];
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: responses[Math.floor(Math.random() * responses.length)]
-      }]);
-      setIsLoading(false);
-    }, 1200);
+    // Build chat history (skip first welcome message)
+    const chatHistory = updatedMessages
+      .slice(1)
+      .map(m => ({ role: m.role, content: m.content }));
+
+    const userContext = {
+      name: user.name,
+      goal: user.goal,
+      activityLevel: user.activityLevel,
+      caloriesEaten: totalCals,
+      streak: streak.count,
+      weight: user.weight,
+      height: user.height,
+      age: user.age,
+    };
+
+    let assistantSoFar = '';
+
+    try {
+      const resp = await fetch(CHAT_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({ messages: chatHistory, userContext }),
+      });
+
+      if (!resp.ok) {
+        const errorData = await resp.json().catch(() => ({}));
+        const errorMsg = errorData.error || `Error ${resp.status}`;
+        setMessages(prev => [...prev, { role: 'assistant', content: `⚠️ ${errorMsg}` }]);
+        setIsLoading(false);
+        return;
+      }
+
+      if (!resp.body) throw new Error('No response body');
+
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let textBuffer = '';
+      let streamDone = false;
+
+      while (!streamDone) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        textBuffer += decoder.decode(value, { stream: true });
+
+        let newlineIndex: number;
+        while ((newlineIndex = textBuffer.indexOf('\n')) !== -1) {
+          let line = textBuffer.slice(0, newlineIndex);
+          textBuffer = textBuffer.slice(newlineIndex + 1);
+
+          if (line.endsWith('\r')) line = line.slice(0, -1);
+          if (line.startsWith(':') || line.trim() === '') continue;
+          if (!line.startsWith('data: ')) continue;
+
+          const jsonStr = line.slice(6).trim();
+          if (jsonStr === '[DONE]') { streamDone = true; break; }
+
+          try {
+            const parsed = JSON.parse(jsonStr);
+            const content = parsed.choices?.[0]?.delta?.content as string | undefined;
+            if (content) {
+              assistantSoFar += content;
+              const currentContent = assistantSoFar;
+              setMessages(prev => {
+                const last = prev[prev.length - 1];
+                if (last?.role === 'assistant' && prev.length > 1 && last !== updatedMessages[0]) {
+                  return prev.map((m, i) => i === prev.length - 1 ? { ...m, content: currentContent } : m);
+                }
+                return [...prev, { role: 'assistant', content: currentContent }];
+              });
+            }
+          } catch {
+            textBuffer = line + '\n' + textBuffer;
+            break;
+          }
+        }
+      }
+
+      // Flush remaining buffer
+      if (textBuffer.trim()) {
+        for (let raw of textBuffer.split('\n')) {
+          if (!raw) continue;
+          if (raw.endsWith('\r')) raw = raw.slice(0, -1);
+          if (raw.startsWith(':') || raw.trim() === '') continue;
+          if (!raw.startsWith('data: ')) continue;
+          const jsonStr = raw.slice(6).trim();
+          if (jsonStr === '[DONE]') continue;
+          try {
+            const parsed = JSON.parse(jsonStr);
+            const content = parsed.choices?.[0]?.delta?.content as string | undefined;
+            if (content) {
+              assistantSoFar += content;
+              const currentContent = assistantSoFar;
+              setMessages(prev => {
+                const last = prev[prev.length - 1];
+                if (last?.role === 'assistant') {
+                  return prev.map((m, i) => i === prev.length - 1 ? { ...m, content: currentContent } : m);
+                }
+                return [...prev, { role: 'assistant', content: currentContent }];
+              });
+            }
+          } catch { /* ignore */ }
+        }
+      }
+    } catch (e) {
+      console.error('Chat error:', e);
+      setMessages(prev => [...prev, { role: 'assistant', content: '⚠️ Something went wrong. Please try again.' }]);
+    }
+
+    setIsLoading(false);
   };
 
   const chips = ["What should I eat tonight?", "Am I on track today?", "Suggest a recovery tip"];
@@ -70,7 +174,7 @@ export default function CoachPage() {
           <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-4">
             {messages.map((m, i) => (
               <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[80%] p-4 rounded-2xl text-sm ${
+                <div className={`max-w-[80%] p-4 rounded-2xl text-sm whitespace-pre-wrap ${
                   m.role === 'user'
                     ? 'bg-primary text-primary-foreground rounded-br-md'
                     : 'bg-secondary rounded-bl-md'
@@ -79,7 +183,7 @@ export default function CoachPage() {
                 </div>
               </div>
             ))}
-            {isLoading && (
+            {isLoading && assistantSoFar === '' && (
               <div className="flex justify-start">
                 <div className="bg-secondary p-4 rounded-2xl rounded-bl-md">
                   <div className="flex gap-1.5">
@@ -95,8 +199,8 @@ export default function CoachPage() {
           {/* Quick Chips */}
           <div className="px-6 pb-2 flex gap-2 flex-wrap">
             {chips.map(c => (
-              <button key={c} onClick={() => sendMessage(c)}
-                className="text-xs px-3 py-1.5 rounded-full bg-secondary hover:bg-muted text-muted-foreground hover:text-foreground transition-colors">
+              <button key={c} onClick={() => sendMessage(c)} disabled={isLoading}
+                className="text-xs px-3 py-1.5 rounded-full bg-secondary hover:bg-muted text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50">
                 {c}
               </button>
             ))}
@@ -108,9 +212,10 @@ export default function CoachPage() {
               <input value={input} onChange={e => setInput(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && sendMessage()}
                 placeholder="Ask your AI coach..."
-                className="flex-1 bg-secondary rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 placeholder:text-muted-foreground" />
-              <button onClick={() => sendMessage()}
-                className="w-12 h-12 rounded-xl bg-primary text-primary-foreground flex items-center justify-center hover:opacity-90 transition-opacity">
+                disabled={isLoading}
+                className="flex-1 bg-secondary rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 placeholder:text-muted-foreground disabled:opacity-50" />
+              <button onClick={() => sendMessage()} disabled={isLoading}
+                className="w-12 h-12 rounded-xl bg-primary text-primary-foreground flex items-center justify-center hover:opacity-90 transition-opacity disabled:opacity-50">
                 <Send size={18} />
               </button>
             </div>
