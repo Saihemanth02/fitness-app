@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { foodDatabase, alternatives, type FoodEntry } from '@/lib/foodDatabase';
 import { getFoodLog, getAllFoodLogs, addFoodItem, removeFoodItem, unlockBadge, type FoodItem } from '@/lib/store';
+import { supabase } from '@/integrations/supabase/client';
 import { useApp } from '@/components/AppContext';
 import { Search, Plus, X, Upload, Brain, Camera } from 'lucide-react';
 
@@ -87,9 +88,19 @@ export default function NutritionPage() {
         reader.readAsDataURL(file);
       });
       const imageBase64 = await base64Promise;
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        showToast('Please log in to use the food analyzer', 'warning');
+        setIsProcessing(false);
+        return;
+      }
       const resp = await fetch(ANALYZE_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
         body: JSON.stringify({ imageBase64 }),
       });
       if (!resp.ok) {
