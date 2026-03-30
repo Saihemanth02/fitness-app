@@ -283,7 +283,7 @@ export default function NutritionPage() {
             {analyzerMode === 'photo' && (
               <>
                 <input ref={fileInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFileSelect} />
-                <div onClick={() => fileInputRef.current?.click()} onDragOver={e => e.preventDefault()} onDrop={handleDrop}
+                <div onClick={() => fileInputRef.current?.click()} onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; }} onDragEnter={e => e.preventDefault()} onDrop={handleDrop}
                   className="border-2 border-dashed border-border rounded-xl p-6 text-center cursor-pointer hover:border-purple-accent/50 transition-colors relative overflow-hidden">
                   {previewUrl && !isProcessing && !prediction ? (
                     <img src={previewUrl} alt="Food preview" className="w-full h-32 object-cover rounded-lg mb-3" />
