@@ -108,6 +108,26 @@ export default function WorkoutPage() {
           </div>
         </div>
       )}
+
+      <AlertDialog open={showCloseConfirm} onOpenChange={setShowCloseConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Stop workout?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Your progress will be lost. You can minimize instead to keep it running in the background.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep going</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => { closeWorkout(); setShowCloseConfirm(false); }}
+            >
+              Stop workout
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
