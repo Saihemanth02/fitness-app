@@ -10,8 +10,8 @@ import {
 
 export default function WorkoutPage() {
   const {
-    activeWorkout, timeLeft, isRunning, currentExIdx, isMinimized,
-    openWorkout, toggleRunning, resetWorkout, closeWorkout, minimizeWorkout, maximizeWorkout,
+    activeWorkout, timeLeft, isRunning, currentExIdx, isMinimized, completedData,
+    openWorkout, toggleRunning, resetWorkout, closeWorkout, minimizeWorkout, maximizeWorkout, dismissCompletion,
   } = useWorkout();
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
 
