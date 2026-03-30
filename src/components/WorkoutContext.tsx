@@ -3,24 +3,34 @@ import { type WorkoutType } from '@/lib/workoutData';
 import { addWorkout, incrementStreak, unlockBadge } from '@/lib/store';
 import { useApp } from '@/components/AppContext';
 
+interface CompletedWorkoutData {
+  workout: WorkoutType;
+  streakCount: number;
+  badgesEarned: string[];
+}
+
 interface WorkoutContextType {
   activeWorkout: WorkoutType | null;
   timeLeft: number;
   isRunning: boolean;
   currentExIdx: number;
   isMinimized: boolean;
+  completedData: CompletedWorkoutData | null;
   openWorkout: (w: WorkoutType) => void;
   toggleRunning: () => void;
   resetWorkout: () => void;
   closeWorkout: () => void;
   minimizeWorkout: () => void;
   maximizeWorkout: () => void;
+  dismissCompletion: () => void;
 }
 
 const WorkoutContext = createContext<WorkoutContextType>({
   activeWorkout: null, timeLeft: 420, isRunning: false, currentExIdx: 0, isMinimized: false,
+  completedData: null,
   openWorkout: () => {}, toggleRunning: () => {}, resetWorkout: () => {},
   closeWorkout: () => {}, minimizeWorkout: () => {}, maximizeWorkout: () => {},
+  dismissCompletion: () => {},
 });
 
 export const useWorkout = () => useContext(WorkoutContext);
@@ -31,6 +41,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   const [isRunning, setIsRunning] = useState(false);
   const [currentExIdx, setCurrentExIdx] = useState(0);
   const [isMinimized, setIsMinimized] = useState(false);
+  const [completedData, setCompletedData] = useState<CompletedWorkoutData | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval>>(null);
   const { showToast, triggerRefresh } = useApp();
   const activeWorkoutRef = useRef(activeWorkout);
@@ -47,16 +58,21 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       completedAt: Date.now(),
     });
     const s = await incrementStreak();
-    if (await unlockBadge('firstWorkout')) showToast('🏆 Badge: First Workout!');
-    if (s.count >= 7 && await unlockBadge('streak7')) showToast('🏆 Badge: 7-Day Streak!');
-    if (s.count >= 10 && await unlockBadge('streak10')) showToast('🏆 Badge: 10-Day Streak!');
-    showToast(`🎉 ${workout.name} Complete! +${workout.kcal} kcal burned`);
+    const badges: string[] = [];
+    if (await unlockBadge('firstWorkout')) badges.push('🏆 First Workout!');
+    if (s.count >= 7 && await unlockBadge('streak7')) badges.push('🏆 7-Day Streak!');
+    if (s.count >= 10 && await unlockBadge('streak10')) badges.push('🏆 10-Day Streak!');
+    badges.forEach(b => showToast(b));
     triggerRefresh();
+
+    setCompletedData({ workout, streakCount: s.count, badgesEarned: badges });
     setActiveWorkout(null);
     setTimeLeft(420);
     setCurrentExIdx(0);
     setIsMinimized(false);
   }, [showToast, triggerRefresh]);
+
+  const dismissCompletion = useCallback(() => setCompletedData(null), []);
 
   useEffect(() => {
     if (isRunning && timeLeft > 0) {
@@ -87,6 +103,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     setIsRunning(false);
     setCurrentExIdx(0);
     setIsMinimized(false);
+    setCompletedData(null);
   }, []);
 
   const toggleRunning = useCallback(() => setIsRunning(r => !r), []);
@@ -112,8 +129,8 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <WorkoutContext.Provider value={{
-      activeWorkout, timeLeft, isRunning, currentExIdx, isMinimized,
-      openWorkout, toggleRunning, resetWorkout, closeWorkout, minimizeWorkout, maximizeWorkout,
+      activeWorkout, timeLeft, isRunning, currentExIdx, isMinimized, completedData,
+      openWorkout, toggleRunning, resetWorkout, closeWorkout, minimizeWorkout, maximizeWorkout, dismissCompletion,
     }}>
       {children}
     </WorkoutContext.Provider>
