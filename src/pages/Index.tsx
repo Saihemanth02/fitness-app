@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import Sidebar from '@/components/Sidebar';
+import BottomTabs from '@/components/BottomTabs';
 import { AppProvider } from '@/components/AppContext';
 import DashboardPage from '@/pages/DashboardPage';
 import WorkoutPage from '@/pages/WorkoutPage';
@@ -43,7 +44,7 @@ export default function Index() {
         <div className="orb orb-purple" />
 
         <Sidebar activePage={activePage} onNavigate={setActivePage} />
-        <main className="flex-1 overflow-y-auto p-8 relative z-10">
+        <main className="flex-1 overflow-y-auto p-4 md:p-8 pb-20 md:pb-8 relative z-10">
           <AnimatePresence mode="wait">
             <motion.div
               key={activePage}
@@ -63,6 +64,7 @@ export default function Index() {
             </p>
           </div>
         </main>
+        <BottomTabs activePage={activePage} onNavigate={setActivePage} />
       </div>
     </AppProvider>
   );
