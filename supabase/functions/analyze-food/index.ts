@@ -6,54 +6,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
-
-  try {
-    // Authenticate the user
-    const authHeader = req.headers.get("authorization");
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Missing authorization header" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-      { global: { headers: { Authorization: authHeader } } }
-    );
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const { imageBase64 } = await req.json();
-
-    if (!imageBase64 || typeof imageBase64 !== "string") {
-      return new Response(JSON.stringify({ error: "imageBase64 is required" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Validate base64 size (limit to ~10MB)
-    if (imageBase64.length > 10 * 1024 * 1024) {
-      return new Response(JSON.stringify({ error: "Image too large (max 10MB)" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
-
-    const systemPrompt = `You are a food nutrition analysis AI. Analyze the food in the image and respond with ONLY valid JSON (no markdown, no code fences, no extra text).
+const systemPrompt = `You are a food nutrition analysis AI. Analyze the food and respond with ONLY valid JSON (no markdown, no code fences, no extra text).
 
 Response format:
 {
@@ -76,6 +29,66 @@ Rules:
 - If you cannot identify food, set name to "Unknown Food" and confidence to 0
 - Respond with ONLY the JSON object, nothing else`;
 
+serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  try {
+    const authHeader = req.headers.get("authorization");
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: "Missing authorization header" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const body = await req.json();
+    const { imageBase64, foodText } = body;
+
+    // Validate: need either image or text
+    if (!imageBase64 && !foodText) {
+      return new Response(JSON.stringify({ error: "Either imageBase64 or foodText is required" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (foodText && (typeof foodText !== "string" || foodText.trim().length === 0 || foodText.length > 500)) {
+      return new Response(JSON.stringify({ error: "foodText must be 1-500 characters" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (imageBase64 && imageBase64.length > 10 * 1024 * 1024) {
+      return new Response(JSON.stringify({ error: "Image too large (max 10MB)" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+
+    // Build user message based on input type
+    let userContent: any;
+    if (imageBase64) {
+      userContent = [
+        { type: "text", text: "Identify this food, estimate its nutritional content per serving, and suggest a healthier alternative." },
+        { type: "image_url", image_url: { url: imageBase64 } },
+      ];
+    } else {
+      userContent = `Analyze this food item and estimate its nutritional content per typical serving: "${foodText!.trim()}". Provide accurate macros and suggest a healthier alternative.`;
+    }
+
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -83,16 +96,10 @@ Rules:
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "google/gemini-3-flash-preview",
         messages: [
           { role: "system", content: systemPrompt },
-          {
-            role: "user",
-            content: [
-              { type: "text", text: "Identify this food, estimate its nutritional content per serving, and suggest a healthier alternative." },
-              { type: "image_url", image_url: { url: imageBase64 } },
-            ],
-          },
+          { role: "user", content: userContent },
         ],
       }),
     });
@@ -122,8 +129,15 @@ Rules:
       const jsonStr = content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
       parsed = JSON.parse(jsonStr);
     } catch {
-      console.error("Failed to parse AI response");
+      console.error("Failed to parse AI response:", content);
       return new Response(JSON.stringify({ error: "Could not parse AI response" }), {
+        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Validate required fields
+    if (!parsed.name || !Number.isFinite(parsed.calories)) {
+      return new Response(JSON.stringify({ error: "Invalid AI response structure" }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

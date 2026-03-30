@@ -3,7 +3,7 @@ import { foodDatabase, alternatives, type FoodEntry } from '@/lib/foodDatabase';
 import { getFoodLog, getAllFoodLogs, addFoodItem, removeFoodItem, unlockBadge, type FoodItem } from '@/lib/store';
 import { supabase } from '@/integrations/supabase/client';
 import { useApp } from '@/components/AppContext';
-import { Search, Plus, X, Upload, Brain, Camera } from 'lucide-react';
+import { Search, Plus, X, Upload, Brain, Camera, Type, ArrowRight } from 'lucide-react';
 
 interface AIPrediction extends FoodEntry {
   confidence: number;
@@ -19,6 +19,8 @@ export default function NutritionPage() {
   const [prediction, setPrediction] = useState<AIPrediction | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [textQuery, setTextQuery] = useState('');
+  const [analyzerMode, setAnalyzerMode] = useState<'photo' | 'text'>('photo');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -139,6 +141,49 @@ export default function NutritionPage() {
     }
   };
 
+  const handleTextAnalyze = async () => {
+    if (!textQuery.trim()) return;
+    setPrediction(null);
+    setPreviewUrl(null);
+    setIsProcessing(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        showToast('Please log in to use the food analyzer', 'warning');
+        setIsProcessing(false);
+        return;
+      }
+      const resp = await fetch(ANALYZE_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+        body: JSON.stringify({ foodText: textQuery.trim() }),
+      });
+      if (!resp.ok) {
+        const errorData = await resp.json().catch(() => ({}));
+        showToast(errorData.error || `Analysis failed (${resp.status})`, 'warning');
+        setIsProcessing(false);
+        return;
+      }
+      const result = await resp.json();
+      setPrediction({
+        name: result.name || 'Unknown Food', emoji: result.emoji || '🍽️',
+        calories: Math.round(result.calories || 0), protein: Math.round(result.protein || 0),
+        carbs: Math.round(result.carbs || 0), fat: Math.round(result.fat || 0),
+        healthLabel: result.healthLabel || 'Moderate', confidence: result.confidence || 0,
+        alternative: result.alternative,
+      });
+      setTextQuery('');
+    } catch (err) {
+      console.error('Food text analysis error:', err);
+      showToast('Failed to analyze food. Please try again.', 'warning');
+    }
+    setIsProcessing(false);
+  };
+
   const activeAlternatives = foodLog
     .map(f => ({ food: f.name, ...alternatives[f.name] }))
     .filter(a => a.suggestion);
@@ -220,20 +265,56 @@ export default function NutritionPage() {
               <Brain size={18} className="text-purple-accent" />
               <h3 className="font-display text-lg font-bold">AI Food Analyzer</h3>
             </div>
-            <input ref={fileInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFileSelect} />
-            <div onClick={() => fileInputRef.current?.click()} onDragOver={e => e.preventDefault()} onDrop={handleDrop}
-              className="border-2 border-dashed border-border rounded-xl p-6 text-center cursor-pointer hover:border-purple-accent/50 transition-colors relative overflow-hidden">
-              {previewUrl && !isProcessing && !prediction ? (
-                <img src={previewUrl} alt="Food preview" className="w-full h-32 object-cover rounded-lg mb-3" />
-              ) : !previewUrl ? (
-                <>
-                  <div className="flex justify-center gap-3 mb-3"><Upload size={28} className="text-muted-foreground" /><Camera size={28} className="text-muted-foreground" /></div>
-                  <p className="text-sm text-muted-foreground">Upload or take a food photo</p>
-                  <p className="text-[10px] text-muted-foreground mt-1">Drag & drop or click to browse</p>
-                  <p className="text-[10px] text-purple-accent mt-2">Powered by Gemini Vision AI</p>
-                </>
-              ) : null}
+            {/* Mode toggle */}
+            <div className="flex rounded-xl bg-secondary p-1 mb-4">
+              <button onClick={() => setAnalyzerMode('photo')}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition-all ${
+                  analyzerMode === 'photo' ? 'bg-purple-accent text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                }`}>
+                <Camera size={14} /> Photo
+              </button>
+              <button onClick={() => setAnalyzerMode('text')}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition-all ${
+                  analyzerMode === 'text' ? 'bg-purple-accent text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                }`}>
+                <Type size={14} /> Text
+              </button>
             </div>
+            {/* Photo mode */}
+            {analyzerMode === 'photo' && (
+              <>
+                <input ref={fileInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFileSelect} />
+                <div onClick={() => fileInputRef.current?.click()} onDragOver={e => e.preventDefault()} onDrop={handleDrop}
+                  className="border-2 border-dashed border-border rounded-xl p-6 text-center cursor-pointer hover:border-purple-accent/50 transition-colors relative overflow-hidden">
+                  {previewUrl && !isProcessing && !prediction ? (
+                    <img src={previewUrl} alt="Food preview" className="w-full h-32 object-cover rounded-lg mb-3" />
+                  ) : !previewUrl ? (
+                    <>
+                      <div className="flex justify-center gap-3 mb-3"><Upload size={28} className="text-muted-foreground" /><Camera size={28} className="text-muted-foreground" /></div>
+                      <p className="text-sm text-muted-foreground">Upload or take a food photo</p>
+                      <p className="text-[10px] text-muted-foreground mt-1">Drag & drop or click to browse</p>
+                    </>
+                  ) : null}
+                </div>
+              </>
+            )}
+            {/* Text mode */}
+            {analyzerMode === 'text' && (
+              <div className="space-y-3">
+                <div className="relative">
+                  <input value={textQuery} onChange={e => setTextQuery(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleTextAnalyze()}
+                    placeholder="e.g. 2 idlis with sambar, chicken biryani..."
+                    className="w-full bg-secondary rounded-xl pl-4 pr-12 py-3.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-accent/50 placeholder:text-muted-foreground"
+                    disabled={isProcessing} />
+                  <button onClick={handleTextAnalyze} disabled={isProcessing || !textQuery.trim()}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-lg bg-purple-accent flex items-center justify-center hover:opacity-90 transition-opacity disabled:opacity-40">
+                    <ArrowRight size={16} className="text-foreground" />
+                  </button>
+                </div>
+                <p className="text-[10px] text-muted-foreground text-center">Describe your meal and AI will estimate the nutritional content</p>
+              </div>
+            )}
             {isProcessing && (
               <div className="mt-4">
                 {previewUrl && <img src={previewUrl} alt="Analyzing..." className="w-full h-32 object-cover rounded-xl mb-3 opacity-70" />}
