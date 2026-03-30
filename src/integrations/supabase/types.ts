@@ -244,7 +244,8 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      increment_streak: { Args: never; Returns: Json }
+      unlock_badge: { Args: { _badge_key: string }; Returns: boolean }
     }
     Enums: {
       [_ in never]: never
