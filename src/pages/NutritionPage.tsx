@@ -280,6 +280,41 @@ export default function NutritionPage() {
                 <Type size={14} /> Text
               </button>
             </div>
+            {/* Photo mode */}
+            {analyzerMode === 'photo' && (
+              <>
+                <input ref={fileInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFileSelect} />
+                <div onClick={() => fileInputRef.current?.click()} onDragOver={e => e.preventDefault()} onDrop={handleDrop}
+                  className="border-2 border-dashed border-border rounded-xl p-6 text-center cursor-pointer hover:border-purple-accent/50 transition-colors relative overflow-hidden">
+                  {previewUrl && !isProcessing && !prediction ? (
+                    <img src={previewUrl} alt="Food preview" className="w-full h-32 object-cover rounded-lg mb-3" />
+                  ) : !previewUrl ? (
+                    <>
+                      <div className="flex justify-center gap-3 mb-3"><Upload size={28} className="text-muted-foreground" /><Camera size={28} className="text-muted-foreground" /></div>
+                      <p className="text-sm text-muted-foreground">Upload or take a food photo</p>
+                      <p className="text-[10px] text-muted-foreground mt-1">Drag & drop or click to browse</p>
+                    </>
+                  ) : null}
+                </div>
+              </>
+            )}
+            {/* Text mode */}
+            {analyzerMode === 'text' && (
+              <div className="space-y-3">
+                <div className="relative">
+                  <input value={textQuery} onChange={e => setTextQuery(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleTextAnalyze()}
+                    placeholder="e.g. 2 idlis with sambar, chicken biryani..."
+                    className="w-full bg-secondary rounded-xl pl-4 pr-12 py-3.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-accent/50 placeholder:text-muted-foreground"
+                    disabled={isProcessing} />
+                  <button onClick={handleTextAnalyze} disabled={isProcessing || !textQuery.trim()}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-lg bg-purple-accent flex items-center justify-center hover:opacity-90 transition-opacity disabled:opacity-40">
+                    <ArrowRight size={16} className="text-foreground" />
+                  </button>
+                </div>
+                <p className="text-[10px] text-muted-foreground text-center">Describe your meal and AI will estimate the nutritional content</p>
+              </div>
+            )}
             {isProcessing && (
               <div className="mt-4">
                 {previewUrl && <img src={previewUrl} alt="Analyzing..." className="w-full h-32 object-cover rounded-xl mb-3 opacity-70" />}
