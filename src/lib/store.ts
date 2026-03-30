@@ -228,7 +228,8 @@ export async function incrementStreak(): Promise<StreakData> {
     console.error('increment_streak error:', error);
     return await getStreak();
   }
-  return { count: data.count || 0, lastWorkoutDate: data.lastWorkoutDate || '' };
+  const result = data as Record<string, unknown>;
+  return { count: (result.count as number) || 0, lastWorkoutDate: (result.lastWorkoutDate as string) || '' };
 }
 
 // ─── Water ───
