@@ -1,6 +1,12 @@
+import { useState } from 'react';
 import { workouts } from '@/lib/workoutData';
 import { useWorkout } from '@/components/WorkoutContext';
 import { Play, Pause, RotateCcw, X, Minimize2 } from 'lucide-react';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel,
+  AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
+  AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 export default function WorkoutPage() {
   const {
