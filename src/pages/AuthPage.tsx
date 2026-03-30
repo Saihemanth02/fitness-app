@@ -1,9 +1,12 @@
 import { useState } from 'react';
+import { Navigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { lovable } from '@/integrations/lovable/index';
+import { useAuth } from '@/hooks/useAuth';
 import { Mail, Lock, User, Eye, EyeOff } from 'lucide-react';
 
 export default function AuthPage() {
+  const { user, loading: authLoading } = useAuth();
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -12,6 +15,11 @@ export default function AuthPage() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const [showForgot, setShowForgot] = useState(false);
+
+  // Redirect to home if already logged in
+  if (!authLoading && user) {
+    return <Navigate to="/" replace />;
+  }
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
