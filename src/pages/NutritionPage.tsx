@@ -141,6 +141,49 @@ export default function NutritionPage() {
     }
   };
 
+  const handleTextAnalyze = async () => {
+    if (!textQuery.trim()) return;
+    setPrediction(null);
+    setPreviewUrl(null);
+    setIsProcessing(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        showToast('Please log in to use the food analyzer', 'warning');
+        setIsProcessing(false);
+        return;
+      }
+      const resp = await fetch(ANALYZE_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+        body: JSON.stringify({ foodText: textQuery.trim() }),
+      });
+      if (!resp.ok) {
+        const errorData = await resp.json().catch(() => ({}));
+        showToast(errorData.error || `Analysis failed (${resp.status})`, 'warning');
+        setIsProcessing(false);
+        return;
+      }
+      const result = await resp.json();
+      setPrediction({
+        name: result.name || 'Unknown Food', emoji: result.emoji || '🍽️',
+        calories: Math.round(result.calories || 0), protein: Math.round(result.protein || 0),
+        carbs: Math.round(result.carbs || 0), fat: Math.round(result.fat || 0),
+        healthLabel: result.healthLabel || 'Moderate', confidence: result.confidence || 0,
+        alternative: result.alternative,
+      });
+      setTextQuery('');
+    } catch (err) {
+      console.error('Food text analysis error:', err);
+      showToast('Failed to analyze food. Please try again.', 'warning');
+    }
+    setIsProcessing(false);
+  };
+
   const activeAlternatives = foodLog
     .map(f => ({ food: f.name, ...alternatives[f.name] }))
     .filter(a => a.suggestion);
