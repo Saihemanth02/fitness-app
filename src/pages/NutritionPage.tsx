@@ -1,6 +1,6 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { foodDatabase, alternatives, type FoodEntry } from '@/lib/foodDatabase';
-import { store, type FoodItem } from '@/lib/store';
+import { getFoodLog, getAllFoodLogs, addFoodItem, removeFoodItem, unlockBadge, type FoodItem } from '@/lib/store';
 import { useApp } from '@/components/AppContext';
 import { Search, Plus, X, Upload, Brain, Camera } from 'lucide-react';
 
@@ -12,13 +12,17 @@ interface AIPrediction extends FoodEntry {
 const ANALYZE_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-food`;
 
 export default function NutritionPage() {
-  const { showToast, triggerRefresh } = useApp();
+  const { showToast, triggerRefresh, refreshKey } = useApp();
   const [search, setSearch] = useState('');
-  const [foodLog, setFoodLog] = useState<FoodItem[]>(store.getFoodLog());
+  const [foodLog, setFoodLog] = useState<FoodItem[]>([]);
   const [prediction, setPrediction] = useState<AIPrediction | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    getFoodLog().then(setFoodLog);
+  }, [refreshKey]);
 
   const filtered = search.length > 0
     ? foodDatabase.filter(f => f.name.toLowerCase().includes(search.toLowerCase()))
@@ -31,26 +35,25 @@ export default function NutritionPage() {
     fat: foodLog.reduce((s, f) => s + f.fat, 0),
   }), [foodLog]);
 
-  const addFood = (f: FoodEntry) => {
-    const item: FoodItem = {
-      id: Date.now().toString(),
+  const addFood = async (f: FoodEntry) => {
+    await addFoodItem({
       name: f.name, emoji: f.emoji,
       calories: f.calories, protein: f.protein,
       carbs: f.carbs, fat: f.fat,
-      label: f.healthLabel, timestamp: Date.now()
-    };
-    const updated = [...store.getAllFoodLogs(), item];
-    store.setFoodLog(updated);
-    setFoodLog(store.getFoodLog());
+      label: f.healthLabel,
+    });
+    const updated = await getFoodLog();
+    setFoodLog(updated);
     setSearch('');
-    if (store.unlockBadge('firstFood')) showToast('🏆 Badge: First Food Log!');
+    const unlocked = await unlockBadge('firstFood');
+    if (unlocked) showToast('🏆 Badge: First Food Log!');
     triggerRefresh();
   };
 
-  const removeFood = (id: string) => {
-    const all = store.getAllFoodLogs().filter(f => f.id !== id);
-    store.setFoodLog(all);
-    setFoodLog(store.getFoodLog());
+  const removeFood = async (id: string) => {
+    await removeFoodItem(id);
+    const updated = await getFoodLog();
+    setFoodLog(updated);
     triggerRefresh();
   };
 
@@ -73,58 +76,41 @@ export default function NutritionPage() {
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    // Show preview
     const objectUrl = URL.createObjectURL(file);
     setPreviewUrl(objectUrl);
     setPrediction(null);
     setIsProcessing(true);
-
     try {
-      // Convert to base64
       const reader = new FileReader();
       const base64Promise = new Promise<string>((resolve) => {
         reader.onload = () => resolve(reader.result as string);
         reader.readAsDataURL(file);
       });
       const imageBase64 = await base64Promise;
-
-      // Call AI
       const resp = await fetch(ANALYZE_URL, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-        },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
         body: JSON.stringify({ imageBase64 }),
       });
-
       if (!resp.ok) {
         const errorData = await resp.json().catch(() => ({}));
         showToast(errorData.error || `Analysis failed (${resp.status})`, 'warning');
         setIsProcessing(false);
         return;
       }
-
       const result = await resp.json();
       setPrediction({
-        name: result.name || 'Unknown Food',
-        emoji: result.emoji || '🍽️',
-        calories: Math.round(result.calories || 0),
-        protein: Math.round(result.protein || 0),
-        carbs: Math.round(result.carbs || 0),
-        fat: Math.round(result.fat || 0),
-        healthLabel: result.healthLabel || 'Moderate',
-        confidence: result.confidence || 0,
+        name: result.name || 'Unknown Food', emoji: result.emoji || '🍽️',
+        calories: Math.round(result.calories || 0), protein: Math.round(result.protein || 0),
+        carbs: Math.round(result.carbs || 0), fat: Math.round(result.fat || 0),
+        healthLabel: result.healthLabel || 'Moderate', confidence: result.confidence || 0,
         alternative: result.alternative,
       });
     } catch (err) {
       console.error('Food analysis error:', err);
       showToast('Failed to analyze food photo. Please try again.', 'warning');
     }
-
     setIsProcessing(false);
-    // Reset input so same file can be re-selected
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -132,7 +118,6 @@ export default function NutritionPage() {
     e.preventDefault();
     const file = e.dataTransfer.files?.[0];
     if (file && file.type.startsWith('image/')) {
-      // Create a synthetic event
       const dt = new DataTransfer();
       dt.items.add(file);
       if (fileInputRef.current) {
@@ -157,7 +142,6 @@ export default function NutritionPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-6">
         <div className="space-y-6">
-          {/* Search */}
           <div className="glass-card p-6">
             <div className="relative">
               <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -180,7 +164,6 @@ export default function NutritionPage() {
             )}
           </div>
 
-          {/* Totals */}
           <div className="grid grid-cols-4 gap-3">
             {[
               { label: 'Calories', value: totals.calories, unit: 'kcal', color: 'text-gold' },
@@ -195,7 +178,6 @@ export default function NutritionPage() {
             ))}
           </div>
 
-          {/* Food Log */}
           <div className="glass-card p-6">
             <h3 className="font-display text-lg font-bold mb-4">Today's Food Log</h3>
             {foodLog.length === 0 ? (
@@ -208,16 +190,11 @@ export default function NutritionPage() {
                     <div className="flex-1 min-w-0">
                       <span className="text-sm font-medium">{f.name}</span>
                       <div className="flex gap-3 text-[10px] text-muted-foreground mt-0.5">
-                        <span>{f.calories} kcal</span>
-                        <span>P:{f.protein}g</span>
-                        <span>C:{f.carbs}g</span>
-                        <span>F:{f.fat}g</span>
+                        <span>{f.calories} kcal</span><span>P:{f.protein}g</span><span>C:{f.carbs}g</span><span>F:{f.fat}g</span>
                       </div>
                     </div>
                     <span className={`text-[10px] px-2 py-0.5 rounded-full ${labelColor(f.label)}`}>{f.label}</span>
-                    <button onClick={() => removeFood(f.id)} className="text-muted-foreground hover:text-coral transition-colors">
-                      <X size={14} />
-                    </button>
+                    <button onClick={() => removeFood(f.id)} className="text-muted-foreground hover:text-coral transition-colors"><X size={14} /></button>
                   </div>
                 ))}
               </div>
@@ -225,66 +202,36 @@ export default function NutritionPage() {
           </div>
         </div>
 
-        {/* Right Column */}
         <div className="space-y-6">
-          {/* ML Food Predictor */}
           <div className="glass-card p-6">
             <div className="flex items-center gap-2 mb-4">
               <Brain size={18} className="text-purple-accent" />
               <h3 className="font-display text-lg font-bold">AI Food Analyzer</h3>
             </div>
-
-            {/* Hidden file input */}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              className="hidden"
-              onChange={handleFileSelect}
-            />
-
-            {/* Upload zone */}
-            <div
-              onClick={() => fileInputRef.current?.click()}
-              onDragOver={e => e.preventDefault()}
-              onDrop={handleDrop}
-              className="border-2 border-dashed border-border rounded-xl p-6 text-center cursor-pointer hover:border-purple-accent/50 transition-colors relative overflow-hidden"
-            >
+            <input ref={fileInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFileSelect} />
+            <div onClick={() => fileInputRef.current?.click()} onDragOver={e => e.preventDefault()} onDrop={handleDrop}
+              className="border-2 border-dashed border-border rounded-xl p-6 text-center cursor-pointer hover:border-purple-accent/50 transition-colors relative overflow-hidden">
               {previewUrl && !isProcessing && !prediction ? (
                 <img src={previewUrl} alt="Food preview" className="w-full h-32 object-cover rounded-lg mb-3" />
               ) : !previewUrl ? (
                 <>
-                  <div className="flex justify-center gap-3 mb-3">
-                    <Upload size={28} className="text-muted-foreground" />
-                    <Camera size={28} className="text-muted-foreground" />
-                  </div>
+                  <div className="flex justify-center gap-3 mb-3"><Upload size={28} className="text-muted-foreground" /><Camera size={28} className="text-muted-foreground" /></div>
                   <p className="text-sm text-muted-foreground">Upload or take a food photo</p>
                   <p className="text-[10px] text-muted-foreground mt-1">Drag & drop or click to browse</p>
                   <p className="text-[10px] text-purple-accent mt-2">Powered by Gemini Vision AI</p>
                 </>
               ) : null}
             </div>
-
-            {/* Processing state */}
             {isProcessing && (
               <div className="mt-4">
-                {previewUrl && (
-                  <img src={previewUrl} alt="Analyzing..." className="w-full h-32 object-cover rounded-xl mb-3 opacity-70" />
-                )}
-                <div className="shimmer h-6 rounded-lg mb-2" />
-                <div className="shimmer h-4 rounded-lg w-3/4 mb-2" />
-                <div className="shimmer h-4 rounded-lg w-1/2" />
+                {previewUrl && <img src={previewUrl} alt="Analyzing..." className="w-full h-32 object-cover rounded-xl mb-3 opacity-70" />}
+                <div className="shimmer h-6 rounded-lg mb-2" /><div className="shimmer h-4 rounded-lg w-3/4 mb-2" /><div className="shimmer h-4 rounded-lg w-1/2" />
                 <p className="text-xs text-purple-accent mt-3 text-center animate-pulse">🔬 AI analyzing your food...</p>
               </div>
             )}
-
-            {/* Prediction result */}
             {prediction && !isProcessing && (
               <div className="mt-4 space-y-3">
-                {previewUrl && (
-                  <img src={previewUrl} alt={prediction.name} className="w-full h-32 object-cover rounded-xl" />
-                )}
+                {previewUrl && <img src={previewUrl} alt={prediction.name} className="w-full h-32 object-cover rounded-xl" />}
                 <div className="glass-card p-4 border-purple-accent/30">
                   <div className="flex items-center gap-3 mb-3">
                     <span className="text-3xl">{prediction.emoji}</span>
@@ -292,37 +239,25 @@ export default function NutritionPage() {
                       <p className="font-display font-bold text-lg">{prediction.name}</p>
                       <div className="flex items-center gap-2">
                         <div className="h-1.5 flex-1 rounded-full bg-secondary overflow-hidden max-w-[80px]">
-                          <div
-                            className="h-full bg-purple-accent rounded-full transition-all duration-700"
-                            style={{ width: `${prediction.confidence}%` }}
-                          />
+                          <div className="h-full bg-purple-accent rounded-full transition-all duration-700" style={{ width: `${prediction.confidence}%` }} />
                         </div>
                         <p className="text-[10px] text-purple-accent">{prediction.confidence}% confidence</p>
                       </div>
                     </div>
                   </div>
-
                   <div className="grid grid-cols-4 gap-2 text-center text-xs mb-3">
                     <div><p className="font-bold text-gold">{prediction.calories}</p><p className="text-muted-foreground">kcal</p></div>
                     <div><p className="font-bold text-teal">{prediction.protein}g</p><p className="text-muted-foreground">protein</p></div>
                     <div><p className="font-bold">{prediction.carbs}g</p><p className="text-muted-foreground">carbs</p></div>
                     <div><p className="font-bold text-coral">{prediction.fat}g</p><p className="text-muted-foreground">fat</p></div>
                   </div>
-
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full ${labelColor(prediction.healthLabel)}`}>
-                    {prediction.healthLabel}
-                  </span>
-
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full ${labelColor(prediction.healthLabel)}`}>{prediction.healthLabel}</span>
                   {prediction.alternative && (
                     <div className="mt-3 p-2.5 rounded-lg bg-secondary/50">
                       <p className="text-[10px] text-muted-foreground mb-0.5">💡 Healthier swap</p>
-                      <p className="text-xs">
-                        <span className="text-teal font-medium">{prediction.alternative.name}</span>
-                        <span className="text-muted-foreground"> — {prediction.alternative.reason}</span>
-                      </p>
+                      <p className="text-xs"><span className="text-teal font-medium">{prediction.alternative.name}</span><span className="text-muted-foreground"> — {prediction.alternative.reason}</span></p>
                     </div>
                   )}
-
                   <button onClick={addPrediction}
                     className="w-full mt-3 bg-purple-accent text-foreground py-2.5 rounded-xl text-sm font-medium hover:opacity-90 transition-opacity flex items-center justify-center gap-2">
                     <Plus size={16} /> Add to Log
@@ -332,7 +267,6 @@ export default function NutritionPage() {
             )}
           </div>
 
-          {/* AI Alternatives */}
           <div className="glass-card p-6">
             <h3 className="font-display text-lg font-bold mb-4">🧠 Smart Swaps</h3>
             <p className="text-[10px] text-purple-accent mb-3">AI-powered healthier alternatives</p>

@@ -1,53 +1,61 @@
 import { useState, useEffect, useMemo } from 'react';
-import { store } from '@/lib/store';
+import { getProfile, getFoodLog, getStreak, getWater, setWater as saveWater, getWorkouts, getTodayCaloriesBurned, unlockBadge, getSteps, setSteps, type UserProfile, type FoodItem, type StreakData, type WaterData, type WorkoutLog } from '@/lib/store';
 import { useApp } from '@/components/AppContext';
 import { Flame, Footprints, Dumbbell, Droplets, Moon } from 'lucide-react';
 
 export default function DashboardPage() {
-  const { refreshKey } = useApp();
-  const [steps, setSteps] = useState(store.getSteps());
-  const [water, setWater] = useState(store.getWater());
-  const { showToast, triggerRefresh } = useApp();
-  const user = store.getUser();
-  const streak = store.getStreak();
-  const foodLog = store.getFoodLog();
+  const { refreshKey, showToast, triggerRefresh } = useApp();
+  const [user, setUser] = useState<UserProfile>({ name: '', age: 24, height: 175, weight: 72, goal: 'Fat Loss', activityLevel: 'Moderate' });
+  const [steps, setStepsState] = useState(0);
+  const [water, setWaterState] = useState<WaterData>({ glasses: Array(8).fill(false), date: '' });
+  const [streak, setStreak] = useState<StreakData>({ count: 0, lastWorkoutDate: '' });
+  const [foodLog, setFoodLog] = useState<FoodItem[]>([]);
+  const [caloriesBurned, setCaloriesBurned] = useState(0);
+  const [allWorkouts, setAllWorkouts] = useState<WorkoutLog[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function load() {
+      const [u, f, s, w, cb, wk] = await Promise.all([
+        getProfile(), getFoodLog(), getStreak(), getWater(), getTodayCaloriesBurned(), getWorkouts()
+      ]);
+      setUser(u); setFoodLog(f); setStreak(s); setWaterState(w); setCaloriesBurned(cb); setAllWorkouts(wk);
+      setStepsState(getSteps());
+      setLoading(false);
+    }
+    load();
+  }, [refreshKey]);
 
   const totalCals = foodLog.reduce((s, f) => s + f.calories, 0);
   const totalProtein = foodLog.reduce((s, f) => s + f.protein, 0);
   const totalCarbs = foodLog.reduce((s, f) => s + f.carbs, 0);
   const totalFat = foodLog.reduce((s, f) => s + f.fat, 0);
-  const caloriesBurned = store.getTodayCaloriesBurned();
   const filledGlasses = water.glasses.filter(Boolean).length;
   const hydration = (filledGlasses * 0.25).toFixed(2);
 
-  // Calorie target
-  const bmr = useMemo(() => {
-    const w = user.weight, h = user.height, a = user.age;
-    return Math.round(10 * w + 6.25 * h - 5 * a + 5);
-  }, [user]);
+  const bmr = useMemo(() => Math.round(10 * user.weight + 6.25 * user.height - 5 * user.age + 5), [user]);
   const actMultiplier = user.activityLevel === 'Sedentary' ? 1.2 : user.activityLevel === 'Light' ? 1.375 : user.activityLevel === 'Active' ? 1.725 : 1.55;
   const calorieTarget = Math.round(bmr * actMultiplier);
 
-  // Step simulation
   useEffect(() => {
     const interval = setInterval(() => {
-      const newSteps = store.getSteps() + Math.floor(Math.random() * 50 + 10);
-      store.setSteps(newSteps);
+      const newSteps = getSteps() + Math.floor(Math.random() * 50 + 10);
       setSteps(newSteps);
+      setStepsState(newSteps);
       if (newSteps >= 10000) {
-        if (store.unlockBadge('steps10k')) {
-          showToast('🏆 Badge Unlocked: 10K Steps!');
-        }
+        unlockBadge('steps10k').then(unlocked => {
+          if (unlocked) showToast('🏆 Badge Unlocked: 10K Steps!');
+        });
       }
     }, 10000);
     return () => clearInterval(interval);
   }, [showToast]);
 
-  const toggleGlass = (i: number) => {
+  const toggleGlass = async (i: number) => {
     const w = { ...water, glasses: [...water.glasses] };
     w.glasses[i] = !w.glasses[i];
-    store.setWater(w);
-    setWater(w);
+    setWaterState(w);
+    await saveWater(w);
     triggerRefresh();
   };
 
@@ -57,16 +65,15 @@ export default function DashboardPage() {
 
   const dayLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
   const weekActivity = useMemo(() => {
-    const workouts = store.getWorkouts();
     const now = new Date();
     return dayLabels.map((_, i) => {
       const d = new Date(now);
       d.setDate(d.getDate() - (now.getDay() === 0 ? 6 : now.getDay() - 1) + i);
       const ds = d.toISOString().split('T')[0];
-      const dayWorkouts = workouts.filter(w => new Date(w.completedAt).toISOString().split('T')[0] === ds);
+      const dayWorkouts = allWorkouts.filter(w => new Date(w.completedAt).toISOString().split('T')[0] === ds);
       return Math.min(dayWorkouts.length * 35 + (Math.random() * 20), 100);
     });
-  }, [refreshKey]);
+  }, [allWorkouts, refreshKey]);
 
   const todayStr = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
   const workoutStatus = caloriesBurned > 0 ? 'Done ✅' : 'Not Started';
@@ -79,13 +86,14 @@ export default function DashboardPage() {
     { icon: Moon, label: 'Sleep Score', value: '7.5', unit: 'hrs', color: 'text-purple-accent' },
   ];
 
+  if (loading) return <div className="animate-fade-in text-center py-20 text-muted-foreground">Loading dashboard...</div>;
+
   return (
     <div className="animate-fade-in">
-      {/* Header */}
       <div className="flex items-center justify-between mb-6 md:mb-8 gap-3">
         <div className="min-w-0">
           <h1 className="font-display text-2xl md:text-3xl font-extrabold truncate">
-            Hey, <span className="text-gold">{user.name}</span> 👋
+            Hey, <span className="text-gold">{user.name || 'there'}</span> 👋
           </h1>
           <p className="text-muted-foreground text-xs md:text-sm mt-1">{todayStr}</p>
         </div>
@@ -98,7 +106,6 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Stats Row */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4 mb-6 md:mb-8">
         {stats.map((s, i) => (
           <div key={i} className="glass-card-hover p-4">
@@ -113,33 +120,23 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      {/* Two Column Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-4 md:gap-6">
-        {/* Left Column */}
         <div className="space-y-6">
-          {/* Donut + Macros */}
           <div className="glass-card p-6">
             <h3 className="font-display text-lg font-bold mb-4">Calorie Intake</h3>
             <div className="flex items-center gap-8">
-              {/* Donut */}
               <div className="relative">
                 <svg width="130" height="130" className="-rotate-90">
                   <circle cx="65" cy="65" r="54" fill="none" stroke="hsl(var(--border))" strokeWidth="10" />
-                  <circle
-                    cx="65" cy="65" r="54" fill="none"
-                    stroke="hsl(var(--primary))" strokeWidth="10"
-                    strokeDasharray={circumference}
-                    strokeDashoffset={strokeDashoffset}
-                    strokeLinecap="round"
-                    className="transition-all duration-1000"
-                  />
+                  <circle cx="65" cy="65" r="54" fill="none" stroke="hsl(var(--primary))" strokeWidth="10"
+                    strokeDasharray={circumference} strokeDashoffset={strokeDashoffset} strokeLinecap="round"
+                    className="transition-all duration-1000" />
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
                   <span className="font-display text-xl font-bold">{totalCals}</span>
                   <span className="text-[10px] text-muted-foreground">/ {calorieTarget}</span>
                 </div>
               </div>
-              {/* Macros */}
               <div className="flex-1 space-y-3">
                 {[
                   { label: 'Protein', value: totalProtein, max: Math.round(user.weight * 0.8 * 2), color: 'bg-teal' },
@@ -152,10 +149,8 @@ export default function DashboardPage() {
                       <span className="font-medium">{m.value}g / {m.max}g</span>
                     </div>
                     <div className="h-2 rounded-full bg-secondary overflow-hidden">
-                      <div
-                        className={`h-full rounded-full ${m.color} transition-all duration-800`}
-                        style={{ width: `${Math.min((m.value / m.max) * 100, 100)}%` }}
-                      />
+                      <div className={`h-full rounded-full ${m.color} transition-all duration-800`}
+                        style={{ width: `${Math.min((m.value / m.max) * 100, 100)}%` }} />
                     </div>
                   </div>
                 ))}
@@ -163,17 +158,14 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Weekly Activity */}
           <div className="glass-card p-6">
             <h3 className="font-display text-lg font-bold mb-4">Weekly Activity</h3>
             <div className="flex items-end gap-3 h-32">
               {dayLabels.map((d, i) => (
                 <div key={i} className="flex-1 flex flex-col items-center gap-2">
                   <div className="w-full bg-secondary rounded-lg overflow-hidden relative" style={{ height: '100px' }}>
-                    <div
-                      className="absolute bottom-0 w-full bg-primary/60 rounded-lg transition-all duration-700"
-                      style={{ height: `${weekActivity[i]}%` }}
-                    />
+                    <div className="absolute bottom-0 w-full bg-primary/60 rounded-lg transition-all duration-700"
+                      style={{ height: `${weekActivity[i]}%` }} />
                   </div>
                   <span className="text-[10px] text-muted-foreground">{d}</span>
                 </div>
@@ -182,22 +174,15 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Right Column */}
         <div className="space-y-6">
-          {/* Water Tracker */}
           <div className="glass-card p-6">
             <h3 className="font-display text-lg font-bold mb-4">Water Tracker 💧</h3>
             <div className="grid grid-cols-4 gap-3">
               {water.glasses.map((filled, i) => (
-                <button
-                  key={i}
-                  onClick={() => toggleGlass(i)}
+                <button key={i} onClick={() => toggleGlass(i)}
                   className={`h-16 rounded-xl border-2 transition-all duration-300 flex items-center justify-center text-2xl ${
-                    filled
-                      ? 'bg-teal/20 border-teal'
-                      : 'border-border hover:border-teal/50'
-                  }`}
-                >
+                    filled ? 'bg-teal/20 border-teal' : 'border-border hover:border-teal/50'
+                  }`}>
                   {filled ? '💧' : '🥛'}
                 </button>
               ))}
@@ -207,7 +192,6 @@ export default function DashboardPage() {
             </p>
           </div>
 
-          {/* Today's Workout Preview */}
           <div className="glass-card p-6">
             <h3 className="font-display text-lg font-bold mb-4">Today's Workout 💪</h3>
             <div className="space-y-2">

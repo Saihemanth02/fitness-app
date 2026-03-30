@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { workouts, type WorkoutType } from '@/lib/workoutData';
-import { store } from '@/lib/store';
+import { addWorkout, incrementStreak, unlockBadge } from '@/lib/store';
 import { useApp } from '@/components/AppContext';
 import { Play, Pause, RotateCcw, X } from 'lucide-react';
 
@@ -36,19 +36,19 @@ export default function WorkoutPage() {
     }
   }, [timeLeft, activeWorkout]);
 
-  const completeWorkout = () => {
+  const completeWorkout = async () => {
     if (!activeWorkout) return;
     setIsRunning(false);
-    store.addWorkout({
+    await addWorkout({
       type: activeWorkout.name,
       duration: 7,
       caloriesBurned: activeWorkout.kcal,
       completedAt: Date.now()
     });
-    const s = store.incrementStreak();
-    if (store.unlockBadge('firstWorkout')) showToast('🏆 Badge: First Workout!');
-    if (s.count >= 7 && store.unlockBadge('streak7')) showToast('🏆 Badge: 7-Day Streak!');
-    if (s.count >= 10 && store.unlockBadge('streak10')) showToast('🏆 Badge: 10-Day Streak!');
+    const s = await incrementStreak();
+    if (await unlockBadge('firstWorkout')) showToast('🏆 Badge: First Workout!');
+    if (s.count >= 7 && await unlockBadge('streak7')) showToast('🏆 Badge: 7-Day Streak!');
+    if (s.count >= 10 && await unlockBadge('streak10')) showToast('🏆 Badge: 10-Day Streak!');
     showToast(`🎉 ${activeWorkout.name} Complete! +${activeWorkout.kcal} kcal burned`);
     triggerRefresh();
     setActiveWorkout(null);
@@ -82,38 +82,28 @@ export default function WorkoutPage() {
             <div className="text-4xl mb-3">{w.emoji}</div>
             <h3 className="font-display text-lg font-bold">{w.name}</h3>
             <div className="flex items-center gap-3 mt-2 text-sm text-muted-foreground">
-              <span>{w.duration}</span>
-              <span>·</span>
-              <span>{w.kcal} kcal</span>
-              <span className={`ml-auto text-xs px-2 py-0.5 rounded-full ${difficultyColor(w.difficultyColor)}`}>
-                {w.difficulty}
-              </span>
+              <span>{w.duration}</span><span>·</span><span>{w.kcal} kcal</span>
+              <span className={`ml-auto text-xs px-2 py-0.5 rounded-full ${difficultyColor(w.difficultyColor)}`}>{w.difficulty}</span>
             </div>
           </button>
         ))}
       </div>
 
-      {/* Workout Modal */}
       {activeWorkout && (
         <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-end md:items-center justify-center p-0 md:p-4">
           <div className="glass-card w-full md:max-w-lg p-6 md:p-8 relative rounded-t-3xl md:rounded-2xl max-h-[90vh] overflow-y-auto">
             <button onClick={() => { setActiveWorkout(null); setIsRunning(false); if (timerRef.current) clearInterval(timerRef.current); }}
-              className="absolute top-4 right-4 text-muted-foreground hover:text-foreground">
-              <X size={20} />
-            </button>
+              className="absolute top-4 right-4 text-muted-foreground hover:text-foreground"><X size={20} /></button>
             <div className="text-center mb-6">
               <span className="text-4xl">{activeWorkout.emoji}</span>
               <h2 className="font-display text-2xl font-extrabold mt-2">{activeWorkout.name}</h2>
             </div>
-
-            {/* Timer Ring */}
             <div className="flex justify-center mb-6">
               <div className="relative">
                 <svg width="160" height="160" className="-rotate-90">
                   <circle cx="80" cy="80" r="70" fill="none" stroke="hsl(var(--border))" strokeWidth="6" />
                   <circle cx="80" cy="80" r="70" fill="none" stroke="hsl(var(--primary))" strokeWidth="6"
-                    strokeDasharray={timerCircumference} strokeDashoffset={timerProgress}
-                    strokeLinecap="round" className="transition-all duration-1000" />
+                    strokeDasharray={timerCircumference} strokeDashoffset={timerProgress} strokeLinecap="round" className="transition-all duration-1000" />
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
                   <span className="font-display text-3xl font-bold">{mins}:{secs.toString().padStart(2, '0')}</span>
@@ -121,8 +111,6 @@ export default function WorkoutPage() {
                 </div>
               </div>
             </div>
-
-            {/* Controls */}
             <div className="flex justify-center gap-4 mb-6">
               <button onClick={() => setIsRunning(!isRunning)}
                 className="w-14 h-14 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:opacity-90 transition-opacity">
@@ -133,8 +121,6 @@ export default function WorkoutPage() {
                 <RotateCcw size={20} />
               </button>
             </div>
-
-            {/* Exercise List */}
             <div className="space-y-2">
               {activeWorkout.exercises.map((ex, i) => (
                 <div key={i} className={`flex items-center gap-3 p-3 rounded-xl transition-all ${
@@ -144,9 +130,7 @@ export default function WorkoutPage() {
                     i === currentExIdx ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground'
                   }`}>{i + 1}</span>
                   <span className={`text-sm ${i === currentExIdx ? 'font-semibold' : ''}`}>{ex.name}</span>
-                  <span className="ml-auto text-xs text-muted-foreground">
-                    {ex.duration || `${ex.sets}×${ex.reps}`}
-                  </span>
+                  <span className="ml-auto text-xs text-muted-foreground">{ex.duration || `${ex.sets}×${ex.reps}`}</span>
                 </div>
               ))}
             </div>

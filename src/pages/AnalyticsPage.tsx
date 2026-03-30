@@ -1,11 +1,11 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import {
   AreaChart, Area, BarChart, Bar, LineChart, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
 import { TrendingUp, Flame, Dumbbell, Zap, Scale } from 'lucide-react';
-import { store } from '@/lib/store';
+import { getAllFoodLogs, getWorkouts, getWeightHistory, getProfile, getStreak, addWeightEntry, type FoodItem, type WorkoutLog, type UserProfile } from '@/lib/store';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 
@@ -27,57 +27,54 @@ function shortDay(dateStr: string) {
 
 export default function AnalyticsPage() {
   const days = getLast7Days();
-  const allFood = store.getAllFoodLogs();
-  const allWorkouts = store.getWorkouts();
-  const weightHistory = store.getWeightHistory();
-  const profile = store.getUser();
-
+  const [allFood, setAllFood] = useState<FoodItem[]>([]);
+  const [allWorkouts, setAllWorkouts] = useState<WorkoutLog[]>([]);
+  const [weightHistory, setWeightHistory] = useState<{ date: string; weight: number }[]>([]);
+  const [profile, setProfile] = useState<UserProfile>({ name: '', age: 24, height: 175, weight: 72, goal: 'Fat Loss', activityLevel: 'Moderate' });
+  const [streak, setStreak] = useState(0);
   const [weightInput, setWeightInput] = useState('');
+  const [loading, setLoading] = useState(true);
 
-  // Calorie trend data
+  useEffect(() => {
+    async function load() {
+      const [f, w, wh, p, s] = await Promise.all([
+        getAllFoodLogs(), getWorkouts(), getWeightHistory(), getProfile(), getStreak()
+      ]);
+      setAllFood(f); setAllWorkouts(w); setWeightHistory(wh); setProfile(p); setStreak(s.count);
+      setLoading(false);
+    }
+    load();
+  }, []);
+
   const calorieData = useMemo(() => days.map(day => {
-    const consumed = allFood
-      .filter(f => new Date(f.timestamp).toISOString().split('T')[0] === day)
-      .reduce((s, f) => s + f.calories, 0);
-    const burned = allWorkouts
-      .filter(w => new Date(w.completedAt).toISOString().split('T')[0] === day)
-      .reduce((s, w) => s + w.caloriesBurned, 0);
+    const consumed = allFood.filter(f => new Date(f.timestamp).toISOString().split('T')[0] === day).reduce((s, f) => s + f.calories, 0);
+    const burned = allWorkouts.filter(w => new Date(w.completedAt).toISOString().split('T')[0] === day).reduce((s, w) => s + w.caloriesBurned, 0);
     return { day: shortDay(day), consumed, burned };
   }), [days, allFood, allWorkouts]);
 
-  // Workout frequency data
-  const workoutData = useMemo(() => days.map(day => {
-    const dayWorkouts = allWorkouts.filter(
-      w => new Date(w.completedAt).toISOString().split('T')[0] === day
-    );
-    return { day: shortDay(day), count: dayWorkouts.length };
-  }), [days, allWorkouts]);
+  const workoutData = useMemo(() => days.map(day => ({
+    day: shortDay(day),
+    count: allWorkouts.filter(w => new Date(w.completedAt).toISOString().split('T')[0] === day).length,
+  })), [days, allWorkouts]);
 
-  // Weight chart data
   const weightData = useMemo(() => {
-    if (weightHistory.length === 0) {
-      return [{ date: shortDay(new Date().toISOString().split('T')[0]), weight: profile.weight }];
-    }
+    if (weightHistory.length === 0) return [{ date: shortDay(new Date().toISOString().split('T')[0]), weight: profile.weight }];
     return weightHistory.slice(-14).map(e => ({ date: shortDay(e.date), weight: e.weight }));
   }, [weightHistory, profile.weight]);
 
-  // Summary stats
   const weekCalories = calorieData.reduce((s, d) => s + d.consumed, 0);
   const weekWorkouts = workoutData.reduce((s, d) => s + d.count, 0);
   const avgProtein = Math.round(
-    allFood.filter(f => {
-      const d = new Date(f.timestamp).toISOString().split('T')[0];
-      return days.includes(d);
-    }).reduce((s, f) => s + f.protein, 0) / 7
+    allFood.filter(f => days.includes(new Date(f.timestamp).toISOString().split('T')[0])).reduce((s, f) => s + f.protein, 0) / 7
   );
-  const streak = store.getStreak().count;
 
-  const handleLogWeight = () => {
+  const handleLogWeight = async () => {
     const w = parseFloat(weightInput);
     if (!w || w < 20 || w > 300) return;
-    store.addWeightEntry(w);
+    await addWeightEntry(w);
     setWeightInput('');
-    window.location.reload();
+    const wh = await getWeightHistory();
+    setWeightHistory(wh);
   };
 
   const statCards = [
@@ -92,26 +89,17 @@ export default function AnalyticsPage() {
     labelStyle: { color: 'hsl(222 20% 55%)' },
   };
 
+  if (loading) return <div className="animate-fade-in text-center py-20 text-muted-foreground">Loading analytics...</div>;
+
   return (
     <div className="max-w-6xl mx-auto space-y-6">
-      <motion.h1
-        className="text-2xl md:text-3xl font-display font-extrabold text-foreground"
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-      >
+      <motion.h1 className="text-2xl md:text-3xl font-display font-extrabold text-foreground" initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
         📊 Progress Analytics
       </motion.h1>
 
-      {/* Stat cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {statCards.map((s, i) => (
-          <motion.div
-            key={s.label}
-            className={card}
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.05 }}
-          >
+          <motion.div key={s.label} className={card} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
             <div className="flex items-center gap-2 mb-1">
               <s.icon size={16} className={s.color} />
               <span className="text-[10px] text-muted-foreground font-body uppercase tracking-wider">{s.label}</span>
@@ -121,9 +109,7 @@ export default function AnalyticsPage() {
         ))}
       </div>
 
-      {/* Charts grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Calorie trend */}
         <motion.div className={card} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
           <h2 className="text-sm font-display font-bold text-foreground mb-4">🔥 Weekly Calorie Trend</h2>
           <ResponsiveContainer width="100%" height={220}>
@@ -142,7 +128,6 @@ export default function AnalyticsPage() {
           </div>
         </motion.div>
 
-        {/* Workout frequency */}
         <motion.div className={card} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
           <h2 className="text-sm font-display font-bold text-foreground mb-4">💪 Workout Frequency</h2>
           <ResponsiveContainer width="100%" height={220}>
@@ -156,23 +141,15 @@ export default function AnalyticsPage() {
           </ResponsiveContainer>
         </motion.div>
 
-        {/* Weight tracker */}
         <motion.div className={`${card} lg:col-span-2`} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
             <h2 className="text-sm font-display font-bold text-foreground flex items-center gap-2">
               <Scale size={16} className="text-purple-accent" /> Weight Tracker
             </h2>
             <div className="flex gap-2">
-              <Input
-                type="number"
-                placeholder="Log weight (kg)"
-                value={weightInput}
-                onChange={e => setWeightInput(e.target.value)}
-                className="w-36 h-8 text-xs bg-secondary/50 border-border/50"
-              />
-              <Button size="sm" onClick={handleLogWeight} className="h-8 text-xs bg-primary text-primary-foreground hover:bg-primary/80">
-                Log
-              </Button>
+              <Input type="number" placeholder="Log weight (kg)" value={weightInput} onChange={e => setWeightInput(e.target.value)}
+                className="w-36 h-8 text-xs bg-secondary/50 border-border/50" />
+              <Button size="sm" onClick={handleLogWeight} className="h-8 text-xs bg-primary text-primary-foreground hover:bg-primary/80">Log</Button>
             </div>
           </div>
           <ResponsiveContainer width="100%" height={200}>
