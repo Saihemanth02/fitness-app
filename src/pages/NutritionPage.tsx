@@ -19,6 +19,8 @@ export default function NutritionPage() {
   const [prediction, setPrediction] = useState<AIPrediction | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [textQuery, setTextQuery] = useState('');
+  const [analyzerMode, setAnalyzerMode] = useState<'photo' | 'text'>('photo');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
