@@ -1,67 +1,12 @@
-import { useState, useEffect, useRef } from 'react';
-import { workouts, type WorkoutType } from '@/lib/workoutData';
-import { addWorkout, incrementStreak, unlockBadge } from '@/lib/store';
-import { useApp } from '@/components/AppContext';
-import { Play, Pause, RotateCcw, X } from 'lucide-react';
+import { workouts } from '@/lib/workoutData';
+import { useWorkout } from '@/components/WorkoutContext';
+import { Play, Pause, RotateCcw, X, Minimize2 } from 'lucide-react';
 
 export default function WorkoutPage() {
-  const [activeWorkout, setActiveWorkout] = useState<WorkoutType | null>(null);
-  const [timeLeft, setTimeLeft] = useState(420);
-  const [isRunning, setIsRunning] = useState(false);
-  const [currentExIdx, setCurrentExIdx] = useState(0);
-  const timerRef = useRef<ReturnType<typeof setInterval>>(null);
-  const { showToast, triggerRefresh } = useApp();
-
-  useEffect(() => {
-    if (isRunning && timeLeft > 0) {
-      timerRef.current = setInterval(() => {
-        setTimeLeft(t => {
-          if (t <= 1) {
-            clearInterval(timerRef.current!);
-            completeWorkout();
-            return 0;
-          }
-          return t - 1;
-        });
-      }, 1000);
-    }
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [isRunning]);
-
-  useEffect(() => {
-    if (activeWorkout) {
-      const elapsed = 420 - timeLeft;
-      const idx = Math.min(Math.floor(elapsed / 84), 4);
-      setCurrentExIdx(idx);
-    }
-  }, [timeLeft, activeWorkout]);
-
-  const completeWorkout = async () => {
-    if (!activeWorkout) return;
-    setIsRunning(false);
-    await addWorkout({
-      type: activeWorkout.name,
-      duration: 7,
-      caloriesBurned: activeWorkout.kcal,
-      completedAt: Date.now()
-    });
-    const s = await incrementStreak();
-    if (await unlockBadge('firstWorkout')) showToast('🏆 Badge: First Workout!');
-    if (s.count >= 7 && await unlockBadge('streak7')) showToast('🏆 Badge: 7-Day Streak!');
-    if (s.count >= 10 && await unlockBadge('streak10')) showToast('🏆 Badge: 10-Day Streak!');
-    showToast(`🎉 ${activeWorkout.name} Complete! +${activeWorkout.kcal} kcal burned`);
-    triggerRefresh();
-    setActiveWorkout(null);
-    setTimeLeft(420);
-    setCurrentExIdx(0);
-  };
-
-  const openWorkout = (w: WorkoutType) => {
-    setActiveWorkout(w);
-    setTimeLeft(420);
-    setIsRunning(false);
-    setCurrentExIdx(0);
-  };
+  const {
+    activeWorkout, timeLeft, isRunning, currentExIdx, isMinimized,
+    openWorkout, toggleRunning, resetWorkout, closeWorkout, minimizeWorkout, maximizeWorkout,
+  } = useWorkout();
 
   const mins = Math.floor(timeLeft / 60);
   const secs = timeLeft % 60;
@@ -89,11 +34,24 @@ export default function WorkoutPage() {
         ))}
       </div>
 
-      {activeWorkout && (
+      {/* Full Workout Modal */}
+      {activeWorkout && !isMinimized && (
         <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-end md:items-center justify-center p-0 md:p-4">
           <div className="glass-card w-full md:max-w-lg p-6 md:p-8 relative rounded-t-3xl md:rounded-2xl max-h-[90vh] overflow-y-auto">
-            <button onClick={() => { setActiveWorkout(null); setIsRunning(false); if (timerRef.current) clearInterval(timerRef.current); }}
-              className="absolute top-4 right-4 text-muted-foreground hover:text-foreground"><X size={20} /></button>
+            {/* Close & Minimize buttons */}
+            <div className="absolute top-4 right-4 flex items-center gap-2">
+              <button onClick={minimizeWorkout}
+                className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                title="Minimize to background">
+                <Minimize2 size={16} />
+              </button>
+              <button onClick={closeWorkout}
+                className="w-8 h-8 rounded-full bg-destructive/10 text-destructive flex items-center justify-center hover:bg-destructive/20 transition-colors"
+                title="Stop workout">
+                <X size={16} />
+              </button>
+            </div>
+
             <div className="text-center mb-6">
               <span className="text-4xl">{activeWorkout.emoji}</span>
               <h2 className="font-display text-2xl font-extrabold mt-2">{activeWorkout.name}</h2>
@@ -112,11 +70,11 @@ export default function WorkoutPage() {
               </div>
             </div>
             <div className="flex justify-center gap-4 mb-6">
-              <button onClick={() => setIsRunning(!isRunning)}
+              <button onClick={toggleRunning}
                 className="w-14 h-14 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:opacity-90 transition-opacity">
                 {isRunning ? <Pause size={24} /> : <Play size={24} />}
               </button>
-              <button onClick={() => { setTimeLeft(420); setIsRunning(false); setCurrentExIdx(0); if (timerRef.current) clearInterval(timerRef.current); }}
+              <button onClick={resetWorkout}
                 className="w-14 h-14 rounded-full bg-secondary flex items-center justify-center hover:bg-muted transition-colors">
                 <RotateCcw size={20} />
               </button>
