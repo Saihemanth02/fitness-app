@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -9,17 +10,82 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
+    // Authenticate the user
+    const authHeader = req.headers.get("authorization");
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: "Missing authorization header" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const { messages, userContext } = await req.json();
+
+    // Validate messages
+    if (!Array.isArray(messages) || messages.length === 0 || messages.length > 50) {
+      return new Response(JSON.stringify({ error: "Invalid messages" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Validate each message
+    for (const msg of messages) {
+      if (!msg.role || !msg.content || typeof msg.content !== "string" || msg.content.length > 2000) {
+        return new Response(JSON.stringify({ error: "Invalid message format" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
+    // Validate userContext
+    if (!userContext || typeof userContext !== "object") {
+      return new Response(JSON.stringify({ error: "userContext is required" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Sanitize userContext values
+    const sanitize = (val: unknown, maxLen = 100): string => {
+      return String(val ?? "").slice(0, maxLen).replace(/[<>]/g, "");
+    };
+    const sanitizeNum = (val: unknown): number => {
+      const n = Number(val);
+      return isNaN(n) ? 0 : Math.min(Math.max(n, 0), 100000);
+    };
+
+    const name = sanitize(userContext.name, 50);
+    const goal = sanitize(userContext.goal, 100);
+    const activityLevel = sanitize(userContext.activityLevel, 50);
+    const caloriesEaten = sanitizeNum(userContext.caloriesEaten);
+    const streak = sanitizeNum(userContext.streak);
+    const weight = sanitizeNum(userContext.weight);
+    const height = sanitizeNum(userContext.height);
+    const age = sanitizeNum(userContext.age);
+
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
     const systemPrompt = `You are FitGenius AI Coach — a world-class fitness, nutrition, and wellness expert.
-The user's name is ${userContext.name}.
-Their fitness goal is: ${userContext.goal}.
-Activity level: ${userContext.activityLevel}.
-Today's calories eaten: ${userContext.caloriesEaten} kcal.
-Current streak: ${userContext.streak} days.
-Weight: ${userContext.weight} kg, Height: ${userContext.height} cm, Age: ${userContext.age}.
+The user's name is ${name}.
+Their fitness goal is: ${goal}.
+Activity level: ${activityLevel}.
+Today's calories eaten: ${caloriesEaten} kcal.
+Current streak: ${streak} days.
+Weight: ${weight} kg, Height: ${height} cm, Age: ${age}.
 
 Rules:
 - Keep responses under 80 words. Be motivating, specific, and actionable.
@@ -55,8 +121,7 @@ Rules:
           status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      const t = await response.text();
-      console.error("AI gateway error:", response.status, t);
+      console.error("AI gateway error:", response.status);
       return new Response(JSON.stringify({ error: "AI gateway error" }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -67,7 +132,7 @@ Rules:
     });
   } catch (e) {
     console.error("chat error:", e);
-    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
+    return new Response(JSON.stringify({ error: "Internal server error" }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
