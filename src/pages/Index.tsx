@@ -47,10 +47,8 @@ export default function Index() {
 
   useEffect(() => {
     async function checkNewUser() {
-      const profile = await getProfile();
-      // Show onboarding if profile has default values (new user)
-      const isNew = !profile.name || (profile.age === 24 && profile.height === 175 && profile.weight === 72);
-      setShowOnboarding(isNew);
+      const { data } = await supabase.from('profiles').select('onboarded').eq('id', user!.id).single();
+      setShowOnboarding(data?.onboarded === false);
       setCheckingOnboarding(false);
     }
     if (user) checkNewUser();
