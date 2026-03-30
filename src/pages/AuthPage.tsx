@@ -1,6 +1,8 @@
 import { useState } from 'react';
+import { Navigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { lovable } from '@/integrations/lovable/index';
+import { useAuth } from '@/hooks/useAuth';
 import { Mail, Lock, User, Eye, EyeOff } from 'lucide-react';
 
 export default function AuthPage() {
