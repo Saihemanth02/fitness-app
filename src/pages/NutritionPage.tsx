@@ -88,9 +88,15 @@ export default function NutritionPage() {
         reader.readAsDataURL(file);
       });
       const imageBase64 = await base64Promise;
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        showToast('Please log in to use the food analyzer', 'warning');
+        setIsProcessing(false);
+        return;
+      }
       const resp = await fetch(ANALYZE_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
         body: JSON.stringify({ imageBase64 }),
       });
       if (!resp.ok) {
