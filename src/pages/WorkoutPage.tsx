@@ -53,7 +53,7 @@ export default function WorkoutPage() {
                   title="Minimize — workout continues in background">
                   <Minimize2 size={16} />
                 </button>
-                <button onClick={closeWorkout}
+                <button onClick={() => setShowCloseConfirm(true)}
                   className="w-9 h-9 rounded-full bg-destructive/10 text-destructive flex items-center justify-center hover:bg-destructive/20 transition-colors"
                   title="Stop workout">
                   <X size={16} />
