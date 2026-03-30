@@ -20,7 +20,7 @@ export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
 
   return (
-    <aside className="w-20 h-screen bg-sidebar border-r border-sidebar-border flex flex-col items-center py-6 gap-1 shrink-0">
+    <aside className="hidden md:flex w-20 h-screen bg-sidebar border-r border-sidebar-border flex-col items-center py-6 gap-1 shrink-0">
       <motion.div
         className="mb-6 text-2xl font-display font-extrabold text-gold"
         initial={{ scale: 0.8, opacity: 0 }}

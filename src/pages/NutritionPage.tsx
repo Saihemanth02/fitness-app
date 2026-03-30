@@ -75,7 +75,7 @@ export default function NutritionPage() {
 
   return (
     <div className="animate-fade-in">
-      <h1 className="font-display text-3xl font-extrabold mb-2">Nutrition <span className="text-gold">🍎</span></h1>
+      <h1 className="font-display text-2xl md:text-3xl font-extrabold mb-2">Nutrition <span className="text-gold">🍎</span></h1>
       <p className="text-muted-foreground text-sm mb-8">Track your meals with AI-powered nutritional analysis</p>
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-6">

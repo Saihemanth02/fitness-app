@@ -98,7 +98,7 @@ export default function PlanPage() {
 
   return (
     <div className="animate-fade-in">
-      <h1 className="font-display text-3xl font-extrabold mb-2">Your Plan <span className="text-gold">📋</span></h1>
+      <h1 className="font-display text-2xl md:text-3xl font-extrabold mb-2">Your Plan <span className="text-gold">📋</span></h1>
       <p className="text-muted-foreground text-sm mb-8">AI-generated workout & meal plan tailored to your goals</p>
 
       {/* Generate Button */}
