@@ -1,16 +1,24 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { foodDatabase, alternatives, type FoodEntry } from '@/lib/foodDatabase';
 import { store, type FoodItem } from '@/lib/store';
 import { useApp } from '@/components/AppContext';
-import { Search, Plus, X, Upload, Brain } from 'lucide-react';
+import { Search, Plus, X, Upload, Brain, Camera } from 'lucide-react';
+
+interface AIPrediction extends FoodEntry {
+  confidence: number;
+  alternative?: { name: string; reason: string };
+}
+
+const ANALYZE_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-food`;
 
 export default function NutritionPage() {
   const { showToast, triggerRefresh } = useApp();
   const [search, setSearch] = useState('');
   const [foodLog, setFoodLog] = useState<FoodItem[]>(store.getFoodLog());
-  const [prediction, setPrediction] = useState<FoodEntry | null>(null);
+  const [prediction, setPrediction] = useState<AIPrediction | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [mlConfidence, setMlConfidence] = useState(0);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const filtered = search.length > 0
     ? foodDatabase.filter(f => f.name.toLowerCase().includes(search.toLowerCase()))
@@ -48,21 +56,90 @@ export default function NutritionPage() {
 
   const addPrediction = () => {
     if (!prediction) return;
-    addFood(prediction);
+    addFood({
+      emoji: prediction.emoji,
+      name: prediction.name,
+      calories: prediction.calories,
+      protein: prediction.protein,
+      carbs: prediction.carbs,
+      fat: prediction.fat,
+      healthLabel: prediction.healthLabel,
+    });
     setPrediction(null);
-    showToast('Added ML prediction to food log!');
+    setPreviewUrl(null);
+    showToast('✅ AI-analyzed food added to log!');
   };
 
-  const handleFileUpload = () => {
-    setIsProcessing(true);
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Show preview
+    const objectUrl = URL.createObjectURL(file);
+    setPreviewUrl(objectUrl);
     setPrediction(null);
-    setTimeout(() => {
-      const randomFood = foodDatabase[Math.floor(Math.random() * foodDatabase.length)];
-      const conf = Math.floor(Math.random() * 9 + 89);
-      setPrediction(randomFood);
-      setMlConfidence(conf);
-      setIsProcessing(false);
-    }, 1500);
+    setIsProcessing(true);
+
+    try {
+      // Convert to base64
+      const reader = new FileReader();
+      const base64Promise = new Promise<string>((resolve) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.readAsDataURL(file);
+      });
+      const imageBase64 = await base64Promise;
+
+      // Call AI
+      const resp = await fetch(ANALYZE_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({ imageBase64 }),
+      });
+
+      if (!resp.ok) {
+        const errorData = await resp.json().catch(() => ({}));
+        showToast(errorData.error || `Analysis failed (${resp.status})`, 'warning');
+        setIsProcessing(false);
+        return;
+      }
+
+      const result = await resp.json();
+      setPrediction({
+        name: result.name || 'Unknown Food',
+        emoji: result.emoji || '🍽️',
+        calories: Math.round(result.calories || 0),
+        protein: Math.round(result.protein || 0),
+        carbs: Math.round(result.carbs || 0),
+        fat: Math.round(result.fat || 0),
+        healthLabel: result.healthLabel || 'Moderate',
+        confidence: result.confidence || 0,
+        alternative: result.alternative,
+      });
+    } catch (err) {
+      console.error('Food analysis error:', err);
+      showToast('Failed to analyze food photo. Please try again.', 'warning');
+    }
+
+    setIsProcessing(false);
+    // Reset input so same file can be re-selected
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files?.[0];
+    if (file && file.type.startsWith('image/')) {
+      // Create a synthetic event
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      if (fileInputRef.current) {
+        fileInputRef.current.files = dt.files;
+        fileInputRef.current.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    }
   };
 
   const activeAlternatives = foodLog
@@ -128,7 +205,7 @@ export default function NutritionPage() {
                 {foodLog.map(f => (
                   <div key={f.id} className="flex items-center gap-3 p-3 rounded-xl border border-border/50 hover:border-border transition-colors">
                     <span className="text-xl">{f.emoji}</span>
-                    <div className="flex-1">
+                    <div className="flex-1 min-w-0">
                       <span className="text-sm font-medium">{f.name}</span>
                       <div className="flex gap-3 text-[10px] text-muted-foreground mt-0.5">
                         <span>{f.calories} kcal</span>
@@ -154,46 +231,103 @@ export default function NutritionPage() {
           <div className="glass-card p-6">
             <div className="flex items-center gap-2 mb-4">
               <Brain size={18} className="text-purple-accent" />
-              <h3 className="font-display text-lg font-bold">ML Food Predictor</h3>
-            </div>
-            <div
-              onClick={handleFileUpload}
-              className="border-2 border-dashed border-border rounded-xl p-8 text-center cursor-pointer hover:border-purple-accent/50 transition-colors"
-            >
-              <Upload size={32} className="mx-auto text-muted-foreground mb-3" />
-              <p className="text-sm text-muted-foreground">Click to upload food photo</p>
-              <p className="text-[10px] text-muted-foreground mt-1">ResNet-50 · TensorFlow · 94.2% accuracy</p>
+              <h3 className="font-display text-lg font-bold">AI Food Analyzer</h3>
             </div>
 
+            {/* Hidden file input */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={handleFileSelect}
+            />
+
+            {/* Upload zone */}
+            <div
+              onClick={() => fileInputRef.current?.click()}
+              onDragOver={e => e.preventDefault()}
+              onDrop={handleDrop}
+              className="border-2 border-dashed border-border rounded-xl p-6 text-center cursor-pointer hover:border-purple-accent/50 transition-colors relative overflow-hidden"
+            >
+              {previewUrl && !isProcessing && !prediction ? (
+                <img src={previewUrl} alt="Food preview" className="w-full h-32 object-cover rounded-lg mb-3" />
+              ) : !previewUrl ? (
+                <>
+                  <div className="flex justify-center gap-3 mb-3">
+                    <Upload size={28} className="text-muted-foreground" />
+                    <Camera size={28} className="text-muted-foreground" />
+                  </div>
+                  <p className="text-sm text-muted-foreground">Upload or take a food photo</p>
+                  <p className="text-[10px] text-muted-foreground mt-1">Drag & drop or click to browse</p>
+                  <p className="text-[10px] text-purple-accent mt-2">Powered by Gemini Vision AI</p>
+                </>
+              ) : null}
+            </div>
+
+            {/* Processing state */}
             {isProcessing && (
-              <div className="mt-4 text-center">
-                <div className="shimmer h-24 rounded-xl" />
-                <p className="text-xs text-purple-accent mt-2">ResNet-50 processing...</p>
+              <div className="mt-4">
+                {previewUrl && (
+                  <img src={previewUrl} alt="Analyzing..." className="w-full h-32 object-cover rounded-xl mb-3 opacity-70" />
+                )}
+                <div className="shimmer h-6 rounded-lg mb-2" />
+                <div className="shimmer h-4 rounded-lg w-3/4 mb-2" />
+                <div className="shimmer h-4 rounded-lg w-1/2" />
+                <p className="text-xs text-purple-accent mt-3 text-center animate-pulse">🔬 AI analyzing your food...</p>
               </div>
             )}
 
+            {/* Prediction result */}
             {prediction && !isProcessing && (
-              <div className="mt-4 glass-card p-4 border-purple-accent/30">
-                <div className="flex items-center gap-3 mb-3">
-                  <span className="text-3xl">{prediction.emoji}</span>
-                  <div>
-                    <p className="font-display font-bold">{prediction.name}</p>
-                    <p className="text-[10px] text-purple-accent">Confidence: {mlConfidence}%</p>
+              <div className="mt-4 space-y-3">
+                {previewUrl && (
+                  <img src={previewUrl} alt={prediction.name} className="w-full h-32 object-cover rounded-xl" />
+                )}
+                <div className="glass-card p-4 border-purple-accent/30">
+                  <div className="flex items-center gap-3 mb-3">
+                    <span className="text-3xl">{prediction.emoji}</span>
+                    <div>
+                      <p className="font-display font-bold text-lg">{prediction.name}</p>
+                      <div className="flex items-center gap-2">
+                        <div className="h-1.5 flex-1 rounded-full bg-secondary overflow-hidden max-w-[80px]">
+                          <div
+                            className="h-full bg-purple-accent rounded-full transition-all duration-700"
+                            style={{ width: `${prediction.confidence}%` }}
+                          />
+                        </div>
+                        <p className="text-[10px] text-purple-accent">{prediction.confidence}% confidence</p>
+                      </div>
+                    </div>
                   </div>
+
+                  <div className="grid grid-cols-4 gap-2 text-center text-xs mb-3">
+                    <div><p className="font-bold text-gold">{prediction.calories}</p><p className="text-muted-foreground">kcal</p></div>
+                    <div><p className="font-bold text-teal">{prediction.protein}g</p><p className="text-muted-foreground">protein</p></div>
+                    <div><p className="font-bold">{prediction.carbs}g</p><p className="text-muted-foreground">carbs</p></div>
+                    <div><p className="font-bold text-coral">{prediction.fat}g</p><p className="text-muted-foreground">fat</p></div>
+                  </div>
+
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full ${labelColor(prediction.healthLabel)}`}>
+                    {prediction.healthLabel}
+                  </span>
+
+                  {prediction.alternative && (
+                    <div className="mt-3 p-2.5 rounded-lg bg-secondary/50">
+                      <p className="text-[10px] text-muted-foreground mb-0.5">💡 Healthier swap</p>
+                      <p className="text-xs">
+                        <span className="text-teal font-medium">{prediction.alternative.name}</span>
+                        <span className="text-muted-foreground"> — {prediction.alternative.reason}</span>
+                      </p>
+                    </div>
+                  )}
+
+                  <button onClick={addPrediction}
+                    className="w-full mt-3 bg-purple-accent text-foreground py-2.5 rounded-xl text-sm font-medium hover:opacity-90 transition-opacity flex items-center justify-center gap-2">
+                    <Plus size={16} /> Add to Log
+                  </button>
                 </div>
-                <div className="grid grid-cols-4 gap-2 text-center text-xs mb-3">
-                  <div><p className="font-bold text-gold">{prediction.calories}</p><p className="text-muted-foreground">kcal</p></div>
-                  <div><p className="font-bold text-teal">{prediction.protein}g</p><p className="text-muted-foreground">protein</p></div>
-                  <div><p className="font-bold">{prediction.carbs}g</p><p className="text-muted-foreground">carbs</p></div>
-                  <div><p className="font-bold text-coral">{prediction.fat}g</p><p className="text-muted-foreground">fat</p></div>
-                </div>
-                <span className={`text-[10px] px-2 py-0.5 rounded-full ${labelColor(prediction.healthLabel)}`}>
-                  {prediction.healthLabel}
-                </span>
-                <button onClick={addPrediction}
-                  className="w-full mt-3 bg-purple-accent text-foreground py-2 rounded-xl text-sm font-medium hover:opacity-90 transition-opacity">
-                  Add to Log
-                </button>
               </div>
             )}
           </div>
@@ -201,7 +335,7 @@ export default function NutritionPage() {
           {/* AI Alternatives */}
           <div className="glass-card p-6">
             <h3 className="font-display text-lg font-bold mb-4">🧠 Smart Swaps</h3>
-            <p className="text-[10px] text-purple-accent mb-3">BERT fine-tuned · Food NLP · F1=0.89</p>
+            <p className="text-[10px] text-purple-accent mb-3">AI-powered healthier alternatives</p>
             {activeAlternatives.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-4">Add foods to see smart alternatives</p>
             ) : (
