@@ -223,15 +223,12 @@ export async function getStreak(): Promise<StreakData> {
 export async function incrementStreak(): Promise<StreakData> {
   const userId = await getUserId();
   if (!userId) return { count: 0, lastWorkoutDate: '' };
-  const s = await getStreak();
-  const t = today();
-  if (s.lastWorkoutDate === t) return s;
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  const yStr = yesterday.toISOString().split('T')[0];
-  const newCount = (s.lastWorkoutDate === yStr || s.count === 0) ? s.count + 1 : 1;
-  await supabase.from('streaks').update({ count: newCount, last_workout_date: t }).eq('user_id', userId);
-  return { count: newCount, lastWorkoutDate: t };
+  const { data, error } = await supabase.rpc('increment_streak');
+  if (error || !data) {
+    console.error('increment_streak error:', error);
+    return await getStreak();
+  }
+  return { count: data.count || 0, lastWorkoutDate: data.lastWorkoutDate || '' };
 }
 
 // ─── Water ───
