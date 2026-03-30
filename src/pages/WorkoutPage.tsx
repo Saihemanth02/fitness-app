@@ -113,6 +113,69 @@ export default function WorkoutPage() {
         </div>
       )}
 
+      {/* Celebration Screen */}
+      {completedData && (
+        <div className="fixed inset-0 bg-background/90 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="glass-card w-full max-w-md rounded-2xl p-8 text-center animate-scale-in">
+            {/* Confetti-like emoji burst */}
+            <div className="text-6xl mb-4 animate-fade-in">🎉</div>
+            <h2 className="font-display text-3xl font-extrabold mb-1 animate-fade-in">
+              Workout Complete!
+            </h2>
+            <p className="text-muted-foreground text-sm mb-8 animate-fade-in">
+              Great job finishing <span className="text-primary font-semibold">{completedData.workout.name}</span>!
+            </p>
+
+            {/* Stats grid */}
+            <div className="grid grid-cols-3 gap-3 mb-8">
+              <div className="glass-card p-4 rounded-xl animate-fade-in">
+                <Clock size={20} className="mx-auto mb-2 text-primary" />
+                <p className="font-display text-xl font-bold">7</p>
+                <p className="text-[10px] text-muted-foreground">minutes</p>
+              </div>
+              <div className="glass-card p-4 rounded-xl animate-fade-in" style={{ animationDelay: '0.1s' }}>
+                <Flame size={20} className="mx-auto mb-2 text-coral" />
+                <p className="font-display text-xl font-bold">{completedData.workout.kcal}</p>
+                <p className="text-[10px] text-muted-foreground">kcal burned</p>
+              </div>
+              <div className="glass-card p-4 rounded-xl animate-fade-in" style={{ animationDelay: '0.2s' }}>
+                <Zap size={20} className="mx-auto mb-2 text-gold" />
+                <p className="font-display text-xl font-bold">{completedData.workout.exercises.length}</p>
+                <p className="text-[10px] text-muted-foreground">exercises</p>
+              </div>
+            </div>
+
+            {/* Streak */}
+            <div className="glass-card p-4 rounded-xl mb-6 flex items-center justify-center gap-3 animate-fade-in" style={{ animationDelay: '0.3s' }}>
+              <Trophy size={22} className="text-gold" />
+              <div className="text-left">
+                <p className="font-display font-bold text-lg">{completedData.streakCount}-day streak 🔥</p>
+                <p className="text-[10px] text-muted-foreground">Keep it going!</p>
+              </div>
+            </div>
+
+            {/* Badges earned */}
+            {completedData.badgesEarned.length > 0 && (
+              <div className="mb-6 space-y-2 animate-fade-in" style={{ animationDelay: '0.4s' }}>
+                {completedData.badgesEarned.map((badge, i) => (
+                  <div key={i} className="bg-primary/10 text-primary rounded-lg py-2 px-4 text-sm font-semibold">
+                    {badge}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <button
+              onClick={dismissCompletion}
+              className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-display font-bold text-sm hover:opacity-90 transition-opacity animate-fade-in"
+              style={{ animationDelay: '0.5s' }}
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      )}
+
       <AlertDialog open={showCloseConfirm} onOpenChange={setShowCloseConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
