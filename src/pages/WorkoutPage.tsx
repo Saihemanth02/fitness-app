@@ -37,20 +37,25 @@ export default function WorkoutPage() {
       {/* Full Workout Modal */}
       {activeWorkout && !isMinimized && (
         <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-end md:items-center justify-center p-0 md:p-4">
-          <div className="glass-card w-full md:max-w-lg p-6 md:p-8 relative rounded-t-3xl md:rounded-2xl max-h-[90vh] overflow-y-auto">
-            {/* Close & Minimize buttons */}
-            <div className="absolute top-4 right-4 flex items-center gap-2">
-              <button onClick={minimizeWorkout}
-                className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                title="Minimize to background">
-                <Minimize2 size={16} />
-              </button>
-              <button onClick={closeWorkout}
-                className="w-8 h-8 rounded-full bg-destructive/10 text-destructive flex items-center justify-center hover:bg-destructive/20 transition-colors"
-                title="Stop workout">
-                <X size={16} />
-              </button>
+          <div className="glass-card w-full md:max-w-lg relative rounded-t-3xl md:rounded-2xl max-h-[90vh] flex flex-col overflow-hidden">
+            {/* Sticky header with Close & Minimize */}
+            <div className="flex items-center justify-between px-6 pt-5 pb-2">
+              <p className="text-xs text-muted-foreground">Workout in progress</p>
+              <div className="flex items-center gap-2">
+                <button onClick={minimizeWorkout}
+                  className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                  title="Minimize — workout continues in background">
+                  <Minimize2 size={16} />
+                </button>
+                <button onClick={closeWorkout}
+                  className="w-9 h-9 rounded-full bg-destructive/10 text-destructive flex items-center justify-center hover:bg-destructive/20 transition-colors"
+                  title="Stop workout">
+                  <X size={16} />
+                </button>
+              </div>
             </div>
+
+            <div className="overflow-y-auto px-6 pb-6 pt-2">
 
             <div className="text-center mb-6">
               <span className="text-4xl">{activeWorkout.emoji}</span>
@@ -91,6 +96,7 @@ export default function WorkoutPage() {
                   <span className="ml-auto text-xs text-muted-foreground">{ex.duration || `${ex.sets}×${ex.reps}`}</span>
                 </div>
               ))}
+            </div>
             </div>
           </div>
         </div>
