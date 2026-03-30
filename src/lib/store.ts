@@ -285,7 +285,11 @@ export async function unlockBadge(key: keyof Badges): Promise<boolean> {
     firstFood: 'first_food',
     planGenerated: 'plan_generated',
   };
-  await supabase.from('badges').update({ [columnMap[key]]: true }).eq('user_id', userId);
+  const { error } = await supabase.rpc('unlock_badge', { _badge_key: columnMap[key] });
+  if (error) {
+    console.error('unlock_badge error:', error);
+    return false;
+  }
   return true;
 }
 
