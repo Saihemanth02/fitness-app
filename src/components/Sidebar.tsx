@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { motion } from 'framer-motion';
 import { LayoutDashboard, Dumbbell, Apple, Bot, CalendarDays, User } from 'lucide-react';
 
 const navItems = [
@@ -20,9 +21,14 @@ export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
 
   return (
     <aside className="w-20 h-screen bg-sidebar border-r border-sidebar-border flex flex-col items-center py-6 gap-1 shrink-0">
-      <div className="mb-6 text-2xl font-display font-extrabold text-gold">
+      <motion.div
+        className="mb-6 text-2xl font-display font-extrabold text-gold"
+        initial={{ scale: 0.8, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+      >
         FG
-      </div>
+      </motion.div>
       {navItems.map(item => {
         const isActive = activePage === item.id;
         const isHovered = hoveredItem === item.id;
@@ -32,16 +38,25 @@ export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
             onClick={() => onNavigate(item.id)}
             onMouseEnter={() => setHoveredItem(item.id)}
             onMouseLeave={() => setHoveredItem(null)}
-            className={`w-14 h-14 rounded-xl flex flex-col items-center justify-center gap-1 transition-all duration-200 ${
-              isActive
-                ? 'bg-primary/15 text-gold'
-                : isHovered
-                ? 'bg-secondary text-foreground'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
+            className="w-14 h-14 rounded-xl flex flex-col items-center justify-center gap-1 transition-colors duration-200 relative"
           >
-            <item.icon size={20} strokeWidth={isActive ? 2.5 : 1.8} />
-            <span className="text-[9px] font-body font-medium">{item.label}</span>
+            {isActive && (
+              <motion.div
+                layoutId="sidebar-active"
+                className="absolute inset-0 rounded-xl bg-primary/15"
+                transition={{ type: 'spring', stiffness: 350, damping: 30 }}
+              />
+            )}
+            <item.icon
+              size={20}
+              strokeWidth={isActive ? 2.5 : 1.8}
+              className={`relative z-10 transition-colors duration-200 ${
+                isActive ? 'text-gold' : isHovered ? 'text-foreground' : 'text-muted-foreground'
+              }`}
+            />
+            <span className={`text-[9px] font-body font-medium relative z-10 transition-colors duration-200 ${
+              isActive ? 'text-gold' : isHovered ? 'text-foreground' : 'text-muted-foreground'
+            }`}>{item.label}</span>
           </button>
         );
       })}
