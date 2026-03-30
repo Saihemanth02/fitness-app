@@ -316,6 +316,42 @@ export async function addWeightEntry(weight: number): Promise<void> {
   }
 }
 
+// ─── Goals ───
+export interface GoalsData {
+  dailyCalories: number;
+  targetWeight: number | null;
+  weeklyWorkouts: number;
+}
+
+export async function getGoals(): Promise<GoalsData> {
+  const userId = await getUserId();
+  if (!userId) return { dailyCalories: 2000, targetWeight: null, weeklyWorkouts: 4 };
+  const { data } = await supabase.from('goals').select('*').eq('user_id', userId).single();
+  if (!data) return { dailyCalories: 2000, targetWeight: null, weeklyWorkouts: 4 };
+  return {
+    dailyCalories: (data as any).daily_calories ?? 2000,
+    targetWeight: (data as any).target_weight ? Number((data as any).target_weight) : null,
+    weeklyWorkouts: (data as any).weekly_workouts ?? 4,
+  };
+}
+
+export async function setGoals(g: GoalsData): Promise<void> {
+  const userId = await getUserId();
+  if (!userId) return;
+  const { data } = await supabase.from('goals').select('id').eq('user_id', userId).single();
+  const payload = {
+    daily_calories: g.dailyCalories,
+    target_weight: g.targetWeight,
+    weekly_workouts: g.weeklyWorkouts,
+    updated_at: new Date().toISOString(),
+  };
+  if (data) {
+    await supabase.from('goals').update(payload).eq('user_id', userId);
+  } else {
+    await supabase.from('goals').insert({ user_id: userId, ...payload });
+  }
+}
+
 // ─── Steps (localStorage only - no table) ───
 export function getSteps(): number {
   try {
