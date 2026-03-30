@@ -122,6 +122,7 @@ export type Database = {
           height: number | null
           id: string
           name: string | null
+          onboarded: boolean
           updated_at: string | null
           weight: number | null
         }
@@ -133,6 +134,7 @@ export type Database = {
           height?: number | null
           id: string
           name?: string | null
+          onboarded?: boolean
           updated_at?: string | null
           weight?: number | null
         }
@@ -144,6 +146,7 @@ export type Database = {
           height?: number | null
           id?: string
           name?: string | null
+          onboarded?: boolean
           updated_at?: string | null
           weight?: number | null
         }
