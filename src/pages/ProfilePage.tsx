@@ -1,15 +1,27 @@
-import { useState, useMemo } from 'react';
-import { store, type UserProfile } from '@/lib/store';
+import { useState, useEffect, useMemo } from 'react';
+import { getProfile, setProfile, getBadges, type UserProfile, type Badges } from '@/lib/store';
+import { useAuth } from '@/hooks/useAuth';
 import { useApp } from '@/components/AppContext';
-import { Save, Award } from 'lucide-react';
+import { Save, Award, LogOut } from 'lucide-react';
 
 const goalOptions = ['Fat Loss', 'Muscle Gain', 'Flexibility', 'Maintenance'];
 const activityOptions = ['Sedentary', 'Light', 'Moderate', 'Active'];
 
 export default function ProfilePage() {
   const { showToast } = useApp();
-  const [user, setUser] = useState<UserProfile>(store.getUser());
-  const badges = store.getBadges();
+  const { user: authUser, signOut } = useAuth();
+  const [user, setUser] = useState<UserProfile>({ name: '', age: 24, height: 175, weight: 72, goal: 'Fat Loss', activityLevel: 'Moderate' });
+  const [badges, setBadges] = useState<Badges>({ firstWorkout: false, streak7: false, streak10: false, steps10k: false, firstFood: false, planGenerated: false });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function load() {
+      const [p, b] = await Promise.all([getProfile(), getBadges()]);
+      setUser(p); setBadges(b);
+      setLoading(false);
+    }
+    load();
+  }, []);
 
   const bmi = useMemo(() => {
     const hm = user.height / 100;
@@ -29,9 +41,13 @@ export default function ProfilePage() {
   const tdee = Math.round(bmr * actMultiplier);
   const proteinTarget = Math.round(user.weight * 0.8);
 
-  const saveProfile = () => {
-    store.setUser(user);
+  const saveProfileData = async () => {
+    await setProfile(user);
     showToast('Profile saved successfully!');
+  };
+
+  const handleSignOut = async () => {
+    await signOut();
   };
 
   const allBadges = [
@@ -43,13 +59,22 @@ export default function ProfilePage() {
     { key: 'planGenerated' as const, emoji: '📋', label: 'Plan Generated', unlocked: badges.planGenerated },
   ];
 
+  if (loading) return <div className="animate-fade-in text-center py-20 text-muted-foreground">Loading profile...</div>;
+
   return (
     <div className="animate-fade-in">
-      <h1 className="font-display text-2xl md:text-3xl font-extrabold mb-2">Profile <span className="text-gold">👤</span></h1>
-      <p className="text-muted-foreground text-sm mb-8">Manage your profile and track achievements</p>
+      <div className="flex items-center justify-between mb-2">
+        <h1 className="font-display text-2xl md:text-3xl font-extrabold">Profile <span className="text-gold">👤</span></h1>
+        <button onClick={handleSignOut}
+          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors text-sm font-medium">
+          <LogOut size={16} /> Sign Out
+        </button>
+      </div>
+      {authUser?.email && (
+        <p className="text-muted-foreground text-sm mb-8">{authUser.email}</p>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Form */}
         <div className="glass-card p-6">
           <h3 className="font-display text-lg font-bold mb-6">Personal Details</h3>
           <div className="space-y-4">
@@ -61,8 +86,7 @@ export default function ProfilePage() {
             ].map(f => (
               <div key={f.key}>
                 <label className="text-xs text-muted-foreground mb-1.5 block">{f.label}</label>
-                <input type={f.type}
-                  value={f.value}
+                <input type={f.type} value={f.value}
                   onChange={e => setUser({ ...user, [f.key]: f.type === 'number' ? Number(e.target.value) : e.target.value })}
                   className="w-full bg-secondary rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
               </div>
@@ -81,7 +105,7 @@ export default function ProfilePage() {
                 {activityOptions.map(a => <option key={a} value={a}>{a}</option>)}
               </select>
             </div>
-            <button onClick={saveProfile}
+            <button onClick={saveProfileData}
               className="w-full bg-primary text-primary-foreground py-3 rounded-xl font-display font-bold flex items-center justify-center gap-2 hover:opacity-90 transition-opacity">
               <Save size={18} /> Save Profile
             </button>
@@ -89,7 +113,6 @@ export default function ProfilePage() {
         </div>
 
         <div className="space-y-6">
-          {/* Calculated Stats */}
           <div className="glass-card p-6">
             <h3 className="font-display text-lg font-bold mb-4">Health Metrics</h3>
             <p className="text-[10px] text-purple-accent mb-4">Linear Regression · R²=0.91 · Mifflin-St Jeor</p>
@@ -97,9 +120,7 @@ export default function ProfilePage() {
               <div className="text-center">
                 <p className="font-display text-2xl font-bold text-gold">{bmi}</p>
                 <p className="text-[10px] text-muted-foreground">BMI</p>
-                <p className={`text-[10px] mt-1 ${
-                  bmiCategory === 'Normal' ? 'text-teal' : bmiCategory === 'Underweight' ? 'text-gold' : 'text-coral'
-                }`}>{bmiCategory}</p>
+                <p className={`text-[10px] mt-1 ${bmiCategory === 'Normal' ? 'text-teal' : bmiCategory === 'Underweight' ? 'text-gold' : 'text-coral'}`}>{bmiCategory}</p>
               </div>
               <div className="text-center">
                 <p className="font-display text-2xl font-bold text-teal">{tdee}</p>
@@ -114,7 +135,6 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          {/* Achievements */}
           <div className="glass-card p-6">
             <h3 className="font-display text-lg font-bold mb-4 flex items-center gap-2">
               <Award size={18} className="text-gold" /> Achievements
@@ -132,7 +152,6 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          {/* Credits */}
           <div className="glass-card p-4 text-center">
             <p className="text-sm font-display font-bold text-gold">Sai Hemanth · GVP MCA</p>
             <p className="text-[10px] text-muted-foreground mt-1">FitGenius AI — Intelligent Wellness OS</p>

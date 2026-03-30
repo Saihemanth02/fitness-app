@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { store, type WeekPlanDay, type MealItem, type PlanData } from '@/lib/store';
+import { useState, useEffect } from 'react';
+import { getProfile, getFoodLog, unlockBadge, type WeekPlanDay, type MealItem, type PlanData, type UserProfile, type FoodItem } from '@/lib/store';
+import { store } from '@/lib/store';
 import { useApp } from '@/components/AppContext';
 import { Sparkles, RefreshCw } from 'lucide-react';
 
@@ -47,30 +48,35 @@ function pickRandom<T>(arr: T[]): T { return arr[Math.floor(Math.random() * arr.
 
 export default function PlanPage() {
   const { showToast, triggerRefresh } = useApp();
-  const user = store.getUser();
+  const [user, setUser] = useState<UserProfile>({ name: '', age: 24, height: 175, weight: 72, goal: 'Fat Loss', activityLevel: 'Moderate' });
   const [plan, setPlan] = useState<PlanData | null>(store.getPlan());
   const [generating, setGenerating] = useState(false);
+  const [foodLog, setFoodLog] = useState<FoodItem[]>([]);
 
-  const generatePlan = () => {
+  useEffect(() => {
+    async function load() {
+      const [u, f] = await Promise.all([getProfile(), getFoodLog()]);
+      setUser(u); setFoodLog(f);
+    }
+    load();
+  }, []);
+
+  const generatePlan = async () => {
     setGenerating(true);
-    setTimeout(() => {
+    setTimeout(async () => {
       const goal = user.goal || 'Maintenance';
       const pool = workoutPool[goal] || workoutPool['Maintenance'];
       const weekPlan: WeekPlanDay[] = days.map((day, i) => ({
-        day,
-        workout: pool.types[i] || 'Rest',
-        emoji: pool.types[i] === 'Rest' ? '😴' : pool.emoji
+        day, workout: pool.types[i] || 'Rest', emoji: pool.types[i] === 'Rest' ? '😴' : pool.emoji
       }));
       const mealPlan = {
-        breakfast: pickRandom(mealDB.breakfast),
-        lunch: pickRandom(mealDB.lunch),
-        snack: pickRandom(mealDB.snack),
-        dinner: pickRandom(mealDB.dinner),
+        breakfast: pickRandom(mealDB.breakfast), lunch: pickRandom(mealDB.lunch),
+        snack: pickRandom(mealDB.snack), dinner: pickRandom(mealDB.dinner),
       };
       const newPlan: PlanData = { weekPlan, mealPlan, generatedAt: Date.now() };
       store.setPlan(newPlan);
       setPlan(newPlan);
-      if (store.unlockBadge('planGenerated')) showToast('🏆 Badge: Plan Generated!');
+      if (await unlockBadge('planGenerated')) showToast('🏆 Badge: Plan Generated!');
       setGenerating(false);
       triggerRefresh();
     }, 1500);
@@ -79,10 +85,8 @@ export default function PlanPage() {
   const regenerateMeals = () => {
     if (!plan) return;
     const mealPlan = {
-      breakfast: pickRandom(mealDB.breakfast),
-      lunch: pickRandom(mealDB.lunch),
-      snack: pickRandom(mealDB.snack),
-      dinner: pickRandom(mealDB.dinner),
+      breakfast: pickRandom(mealDB.breakfast), lunch: pickRandom(mealDB.lunch),
+      snack: pickRandom(mealDB.snack), dinner: pickRandom(mealDB.dinner),
     };
     const updated = { ...plan, mealPlan };
     store.setPlan(updated);
@@ -93,28 +97,22 @@ export default function PlanPage() {
     ? plan.mealPlan.breakfast.calories + plan.mealPlan.lunch.calories + plan.mealPlan.snack.calories + plan.mealPlan.dinner.calories
     : 0;
 
-  const foodLog = store.getFoodLog();
   const eatenCals = foodLog.reduce((s, f) => s + f.calories, 0);
 
   return (
     <div className="animate-fade-in">
       <h1 className="font-display text-2xl md:text-3xl font-extrabold mb-2">Your Plan <span className="text-gold">📋</span></h1>
       <p className="text-muted-foreground text-sm mb-8">AI-generated workout & meal plan tailored to your goals</p>
-
-      {/* Generate Button */}
       <div className="flex items-center gap-4 mb-8">
         <button onClick={generatePlan} disabled={generating}
           className="bg-primary text-primary-foreground px-6 py-3 rounded-xl font-display font-bold flex items-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-50">
-          <Sparkles size={18} />
-          {generating ? 'Generating...' : 'Generate My Plan'}
+          <Sparkles size={18} />{generating ? 'Generating...' : 'Generate My Plan'}
         </button>
         <div className="text-xs text-muted-foreground">
           <p>k-NN model · k=15 neighbors · Pearson similarity</p>
           <p className="text-purple-accent">Goal: {user.goal} · Activity: {user.activityLevel}</p>
         </div>
       </div>
-
-      {/* RL Status Card */}
       <div className="glass-card p-4 mb-6 flex items-center gap-4">
         <div className="w-2 h-2 rounded-full bg-gold animate-pulse" />
         <div>
@@ -122,24 +120,19 @@ export default function PlanPage() {
           <p className="text-[10px] text-muted-foreground">Adapting plan based on 12-day feedback loop · Reward: {plan ? '73' : '0'}%</p>
         </div>
       </div>
-
       {generating && (
         <div className="glass-card p-12 text-center">
           <div className="shimmer h-48 rounded-xl" />
           <p className="text-sm text-purple-accent mt-4">k-NN model computing optimal plan...</p>
         </div>
       )}
-
       {plan && !generating && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Weekly Workout Schedule */}
           <div className="glass-card p-6">
             <h3 className="font-display text-lg font-bold mb-4">Weekly Workout Schedule</h3>
             <div className="space-y-2">
               {plan.weekPlan.map((d, i) => (
-                <div key={i} className={`flex items-center gap-3 p-3 rounded-xl ${
-                  d.workout === 'Rest' ? 'bg-secondary/30' : 'bg-secondary/60'
-                }`}>
+                <div key={i} className={`flex items-center gap-3 p-3 rounded-xl ${d.workout === 'Rest' ? 'bg-secondary/30' : 'bg-secondary/60'}`}>
                   <span className="text-sm font-medium w-24 text-muted-foreground">{d.day}</span>
                   <span className="text-xl">{d.emoji}</span>
                   <span className="text-sm font-medium">{d.workout}</span>
@@ -147,25 +140,18 @@ export default function PlanPage() {
               ))}
             </div>
           </div>
-
-          {/* Daily Meal Plan */}
           <div className="space-y-6">
             <div className="glass-card p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-display text-lg font-bold">Daily Meal Plan</h3>
-                <button onClick={regenerateMeals} className="text-muted-foreground hover:text-foreground transition-colors">
-                  <RefreshCw size={16} />
-                </button>
+                <button onClick={regenerateMeals} className="text-muted-foreground hover:text-foreground transition-colors"><RefreshCw size={16} /></button>
               </div>
               {(['breakfast', 'lunch', 'snack', 'dinner'] as const).map(meal => {
                 const item = plan.mealPlan[meal];
                 return (
                   <div key={meal} className="flex items-center gap-3 py-3 border-b border-border/50 last:border-0">
                     <span className="text-2xl">{item.emoji}</span>
-                    <div className="flex-1">
-                      <p className="text-xs text-muted-foreground capitalize">{meal}</p>
-                      <p className="text-sm font-medium">{item.name}</p>
-                    </div>
+                    <div className="flex-1"><p className="text-xs text-muted-foreground capitalize">{meal}</p><p className="text-sm font-medium">{item.name}</p></div>
                     <span className="text-sm text-gold font-display font-bold">{item.calories} kcal</span>
                   </div>
                 );
@@ -175,8 +161,6 @@ export default function PlanPage() {
                 <span className="text-xs text-muted-foreground ml-2">total kcal planned</span>
               </div>
             </div>
-
-            {/* Calorie Progress */}
             <div className="glass-card p-6">
               <h3 className="font-display font-bold mb-3">Calorie Progress</h3>
               <div className="flex justify-between text-xs mb-2">
@@ -184,12 +168,9 @@ export default function PlanPage() {
                 <span className="text-muted-foreground">Target: {totalMealCals} kcal</span>
               </div>
               <div className="h-3 rounded-full bg-secondary overflow-hidden">
-                <div className="h-full bg-primary rounded-full transition-all duration-700"
-                  style={{ width: `${Math.min((eatenCals / (totalMealCals || 1)) * 100, 100)}%` }} />
+                <div className="h-full bg-primary rounded-full transition-all duration-700" style={{ width: `${Math.min((eatenCals / (totalMealCals || 1)) * 100, 100)}%` }} />
               </div>
-              <p className="text-xs text-center text-muted-foreground mt-2">
-                {totalMealCals > 0 ? `${Math.round((eatenCals / totalMealCals) * 100)}%` : '0%'} of daily target
-              </p>
+              <p className="text-xs text-center text-muted-foreground mt-2">{totalMealCals > 0 ? `${Math.round((eatenCals / totalMealCals) * 100)}%` : '0%'} of daily target</p>
             </div>
           </div>
         </div>
