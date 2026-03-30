@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { setProfile, type UserProfile } from '@/lib/store';
+import { supabase } from '@/integrations/supabase/client';
 import { ChevronRight, ChevronLeft, User, Ruler, Weight, Target, Zap } from 'lucide-react';
 
 const goalOptions = ['Fat Loss', 'Muscle Gain', 'Flexibility', 'Maintenance'];
@@ -116,6 +117,10 @@ export default function OnboardingFlow({ userName, onComplete }: Props) {
   const handleNext = async () => {
     if (isLastStep) {
       await setProfile(profile);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase.from('profiles').update({ onboarded: true }).eq('id', user.id);
+      }
       onComplete();
     } else {
       setStep(s => s + 1);
