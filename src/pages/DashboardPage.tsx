@@ -82,17 +82,17 @@ export default function DashboardPage() {
   return (
     <div className="animate-fade-in">
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="font-display text-2xl md:text-3xl font-extrabold">
+      <div className="flex items-center justify-between mb-6 md:mb-8 gap-3">
+        <div className="min-w-0">
+          <h1 className="font-display text-2xl md:text-3xl font-extrabold truncate">
             Hey, <span className="text-gold">{user.name}</span> 👋
           </h1>
-          <p className="text-muted-foreground text-sm mt-1">{todayStr}</p>
+          <p className="text-muted-foreground text-xs md:text-sm mt-1">{todayStr}</p>
         </div>
-        <div className="glass-card px-5 py-3 flex items-center gap-3">
-          <span className="text-2xl">🔥</span>
+        <div className="glass-card px-3 md:px-5 py-2 md:py-3 flex items-center gap-2 md:gap-3 shrink-0">
+          <span className="text-xl md:text-2xl">🔥</span>
           <div>
-            <p className="font-display text-xl font-bold text-gold">{streak.count}</p>
+            <p className="font-display text-lg md:text-xl font-bold text-gold">{streak.count}</p>
             <p className="text-[10px] text-muted-foreground">Day Streak</p>
           </div>
         </div>
