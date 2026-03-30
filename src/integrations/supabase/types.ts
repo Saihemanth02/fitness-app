@@ -86,6 +86,33 @@ export type Database = {
         }
         Relationships: []
       }
+      goals: {
+        Row: {
+          daily_calories: number | null
+          id: string
+          target_weight: number | null
+          updated_at: string | null
+          user_id: string
+          weekly_workouts: number | null
+        }
+        Insert: {
+          daily_calories?: number | null
+          id?: string
+          target_weight?: number | null
+          updated_at?: string | null
+          user_id: string
+          weekly_workouts?: number | null
+        }
+        Update: {
+          daily_calories?: number | null
+          id?: string
+          target_weight?: number | null
+          updated_at?: string | null
+          user_id?: string
+          weekly_workouts?: number | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           activity_level: string | null
