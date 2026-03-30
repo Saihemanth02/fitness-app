@@ -1,11 +1,12 @@
 import { motion } from 'framer-motion';
-import { LayoutDashboard, Dumbbell, Apple, Bot, CalendarDays, User } from 'lucide-react';
+import { LayoutDashboard, Dumbbell, Apple, Bot, CalendarDays, User, TrendingUp } from 'lucide-react';
 
 const navItems = [
   { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { id: 'workout', icon: Dumbbell, label: 'Workout' },
   { id: 'nutrition', icon: Apple, label: 'Nutrition' },
   { id: 'coach', icon: Bot, label: 'Coach' },
+  { id: 'analytics', icon: TrendingUp, label: 'Analytics' },
   { id: 'plan', icon: CalendarDays, label: 'Plan' },
   { id: 'profile', icon: User, label: 'Profile' },
 ];

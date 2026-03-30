@@ -9,12 +9,14 @@ import NutritionPage from '@/pages/NutritionPage';
 import CoachPage from '@/pages/CoachPage';
 import PlanPage from '@/pages/PlanPage';
 import ProfilePage from '@/pages/ProfilePage';
+import AnalyticsPage from '@/pages/AnalyticsPage';
 
 const pages: Record<string, React.FC> = {
   dashboard: DashboardPage,
   workout: WorkoutPage,
   nutrition: NutritionPage,
   coach: CoachPage,
+  analytics: AnalyticsPage,
   plan: PlanPage,
   profile: ProfilePage,
 };
