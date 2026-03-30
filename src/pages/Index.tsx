@@ -3,6 +3,8 @@ import { AnimatePresence, motion } from 'framer-motion';
 import Sidebar from '@/components/Sidebar';
 import BottomTabs from '@/components/BottomTabs';
 import { AppProvider } from '@/components/AppContext';
+import { WorkoutProvider } from '@/components/WorkoutContext';
+import FloatingWorkoutTimer from '@/components/FloatingWorkoutTimer';
 import DashboardPage from '@/pages/DashboardPage';
 import WorkoutPage from '@/pages/WorkoutPage';
 import NutritionPage from '@/pages/NutritionPage';
@@ -39,35 +41,36 @@ export default function Index() {
 
   return (
     <AppProvider>
-      <div className="flex h-screen overflow-hidden relative">
-        {/* Background Orbs */}
-        <div className="orb orb-gold" />
-        <div className="orb orb-teal" />
-        <div className="orb orb-purple" />
+      <WorkoutProvider>
+        <div className="flex h-screen overflow-hidden relative">
+          <div className="orb orb-gold" />
+          <div className="orb orb-teal" />
+          <div className="orb orb-purple" />
 
-        <Sidebar activePage={activePage} onNavigate={setActivePage} />
-        <main className="flex-1 overflow-y-auto p-4 md:p-8 pb-20 md:pb-8 relative z-10">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={activePage}
-              variants={pageVariants}
-              initial="initial"
-              animate="animate"
-              exit="exit"
-              transition={pageTransition}
-            >
-              <PageComponent />
-            </motion.div>
-          </AnimatePresence>
-          {/* Footer */}
-          <div className="text-center py-8 mt-8 border-t border-border/50">
-            <p className="text-[10px] text-muted-foreground">
-              FitGenius AI · Built by <span className="text-gold font-medium">Sai Hemanth · GVP MCA</span>
-            </p>
-          </div>
-        </main>
-        <BottomTabs activePage={activePage} onNavigate={setActivePage} />
-      </div>
+          <Sidebar activePage={activePage} onNavigate={setActivePage} />
+          <main className="flex-1 overflow-y-auto p-4 md:p-8 pb-20 md:pb-8 relative z-10">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activePage}
+                variants={pageVariants}
+                initial="initial"
+                animate="animate"
+                exit="exit"
+                transition={pageTransition}
+              >
+                <PageComponent />
+              </motion.div>
+            </AnimatePresence>
+            <div className="text-center py-8 mt-8 border-t border-border/50">
+              <p className="text-[10px] text-muted-foreground">
+                FitGenius AI · Built by <span className="text-gold font-medium">Sai Hemanth · GVP MCA</span>
+              </p>
+            </div>
+          </main>
+          <BottomTabs activePage={activePage} onNavigate={setActivePage} />
+          <FloatingWorkoutTimer />
+        </div>
+      </WorkoutProvider>
     </AppProvider>
   );
 }
