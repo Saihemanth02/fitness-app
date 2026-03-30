@@ -7,7 +7,7 @@ import { WorkoutProvider } from '@/components/WorkoutContext';
 import FloatingWorkoutTimer from '@/components/FloatingWorkoutTimer';
 import OnboardingFlow from '@/components/OnboardingFlow';
 import { useAuth } from '@/hooks/useAuth';
-import { getProfile } from '@/lib/store';
+import { supabase } from '@/integrations/supabase/client';
 import DashboardPage from '@/pages/DashboardPage';
 import WorkoutPage from '@/pages/WorkoutPage';
 import NutritionPage from '@/pages/NutritionPage';
