@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { workouts } from '@/lib/workoutData';
 import { useWorkout } from '@/components/WorkoutContext';
-import { Play, Pause, RotateCcw, X, Minimize2 } from 'lucide-react';
+import { Play, Pause, RotateCcw, X, Minimize2, Trophy, Flame, Clock, Zap } from 'lucide-react';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel,
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
