@@ -24,6 +24,7 @@ export default function CoachPage() {
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const user = store.getUser();
   const streak = store.getStreak();
