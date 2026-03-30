@@ -1,12 +1,19 @@
+import { useState } from 'react';
 import { workouts } from '@/lib/workoutData';
 import { useWorkout } from '@/components/WorkoutContext';
 import { Play, Pause, RotateCcw, X, Minimize2 } from 'lucide-react';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel,
+  AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
+  AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 export default function WorkoutPage() {
   const {
     activeWorkout, timeLeft, isRunning, currentExIdx, isMinimized,
     openWorkout, toggleRunning, resetWorkout, closeWorkout, minimizeWorkout, maximizeWorkout,
   } = useWorkout();
+  const [showCloseConfirm, setShowCloseConfirm] = useState(false);
 
   const mins = Math.floor(timeLeft / 60);
   const secs = timeLeft % 60;
@@ -47,7 +54,7 @@ export default function WorkoutPage() {
                   title="Minimize — workout continues in background">
                   <Minimize2 size={16} />
                 </button>
-                <button onClick={closeWorkout}
+                <button onClick={() => setShowCloseConfirm(true)}
                   className="w-9 h-9 rounded-full bg-destructive/10 text-destructive flex items-center justify-center hover:bg-destructive/20 transition-colors"
                   title="Stop workout">
                   <X size={16} />
@@ -101,6 +108,26 @@ export default function WorkoutPage() {
           </div>
         </div>
       )}
+
+      <AlertDialog open={showCloseConfirm} onOpenChange={setShowCloseConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Stop workout?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Your progress will be lost. You can minimize instead to keep it running in the background.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep going</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => { closeWorkout(); setShowCloseConfirm(false); }}
+            >
+              Stop workout
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
