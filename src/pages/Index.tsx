@@ -1,10 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import Sidebar from '@/components/Sidebar';
 import BottomTabs from '@/components/BottomTabs';
 import { AppProvider } from '@/components/AppContext';
 import { WorkoutProvider } from '@/components/WorkoutContext';
 import FloatingWorkoutTimer from '@/components/FloatingWorkoutTimer';
+import OnboardingFlow from '@/components/OnboardingFlow';
+import { useAuth } from '@/hooks/useAuth';
+import { getProfile } from '@/lib/store';
 import DashboardPage from '@/pages/DashboardPage';
 import WorkoutPage from '@/pages/WorkoutPage';
 import NutritionPage from '@/pages/NutritionPage';
@@ -37,11 +40,31 @@ const pageTransition = {
 
 export default function Index() {
   const [activePage, setActivePage] = useState('dashboard');
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [checkingOnboarding, setCheckingOnboarding] = useState(true);
+  const { user } = useAuth();
   const PageComponent = pages[activePage] || DashboardPage;
+
+  useEffect(() => {
+    async function checkNewUser() {
+      const profile = await getProfile();
+      // Show onboarding if profile has default values (new user)
+      const isNew = !profile.name || (profile.age === 24 && profile.height === 175 && profile.weight === 72);
+      setShowOnboarding(isNew);
+      setCheckingOnboarding(false);
+    }
+    if (user) checkNewUser();
+    else setCheckingOnboarding(false);
+  }, [user]);
+
+  const userName = user?.user_metadata?.full_name || user?.user_metadata?.name || '';
 
   return (
     <AppProvider>
       <WorkoutProvider>
+        {showOnboarding && !checkingOnboarding && (
+          <OnboardingFlow userName={userName} onComplete={() => setShowOnboarding(false)} />
+        )}
         <div className="flex h-screen overflow-hidden relative">
           <div className="orb orb-gold" />
           <div className="orb orb-teal" />
