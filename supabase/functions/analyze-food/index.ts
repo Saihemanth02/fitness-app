@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -9,10 +10,41 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
+    // Authenticate the user
+    const authHeader = req.headers.get("authorization");
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: "Missing authorization header" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const { imageBase64 } = await req.json();
 
     if (!imageBase64 || typeof imageBase64 !== "string") {
       return new Response(JSON.stringify({ error: "imageBase64 is required" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Validate base64 size (limit to ~10MB)
+    if (imageBase64.length > 10 * 1024 * 1024) {
+      return new Response(JSON.stringify({ error: "Image too large (max 10MB)" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -76,8 +108,7 @@ Rules:
           status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      const t = await response.text();
-      console.error("AI gateway error:", response.status, t);
+      console.error("AI gateway error:", response.status);
       return new Response(JSON.stringify({ error: "AI analysis failed" }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -86,14 +117,13 @@ Rules:
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content || "";
 
-    // Parse JSON from response (handle possible markdown fences)
     let parsed;
     try {
       const jsonStr = content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
       parsed = JSON.parse(jsonStr);
     } catch {
-      console.error("Failed to parse AI response:", content);
-      return new Response(JSON.stringify({ error: "Could not parse AI response", raw: content }), {
+      console.error("Failed to parse AI response");
+      return new Response(JSON.stringify({ error: "Could not parse AI response" }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -103,7 +133,7 @@ Rules:
     });
   } catch (e) {
     console.error("analyze-food error:", e);
-    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
+    return new Response(JSON.stringify({ error: "Internal server error" }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
