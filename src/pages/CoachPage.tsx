@@ -161,6 +161,7 @@ export default function CoachPage() {
     }
 
     setIsLoading(false);
+    setIsStreaming(false);
   };
 
   const chips = ["What should I eat tonight?", "Am I on track today?", "Suggest a recovery tip"];
