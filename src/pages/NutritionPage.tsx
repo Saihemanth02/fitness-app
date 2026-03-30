@@ -127,12 +127,29 @@ export default function NutritionPage() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  const [isDragging, setIsDragging] = useState(false);
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = 'copy';
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    setIsDragging(false);
+    console.log('[DnD] Drop event fired, files:', e.dataTransfer.files?.length);
     const file = e.dataTransfer.files?.[0];
     if (file && file.type.startsWith('image/')) {
-      // Reuse handleFileSelect by setting the file input's files
+      console.log('[DnD] Processing file:', file.name, file.type);
       const dt = new DataTransfer();
       dt.items.add(file);
       const syntheticEvent = { target: { files: dt.files } } as unknown as React.ChangeEvent<HTMLInputElement>;
