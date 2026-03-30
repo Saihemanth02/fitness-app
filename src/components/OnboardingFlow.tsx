@@ -117,6 +117,10 @@ export default function OnboardingFlow({ userName, onComplete }: Props) {
   const handleNext = async () => {
     if (isLastStep) {
       await setProfile(profile);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase.from('profiles').update({ onboarded: true }).eq('id', user.id);
+      }
       onComplete();
     } else {
       setStep(s => s + 1);
