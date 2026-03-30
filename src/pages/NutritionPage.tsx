@@ -3,7 +3,7 @@ import { foodDatabase, alternatives, type FoodEntry } from '@/lib/foodDatabase';
 import { getFoodLog, getAllFoodLogs, addFoodItem, removeFoodItem, unlockBadge, type FoodItem } from '@/lib/store';
 import { supabase } from '@/integrations/supabase/client';
 import { useApp } from '@/components/AppContext';
-import { Search, Plus, X, Upload, Brain, Camera } from 'lucide-react';
+import { Search, Plus, X, Upload, Brain, Camera, Type, ArrowRight } from 'lucide-react';
 
 interface AIPrediction extends FoodEntry {
   confidence: number;
