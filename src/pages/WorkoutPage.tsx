@@ -13,6 +13,7 @@ export default function WorkoutPage() {
     activeWorkout, timeLeft, isRunning, currentExIdx, isMinimized,
     openWorkout, toggleRunning, resetWorkout, closeWorkout, minimizeWorkout, maximizeWorkout,
   } = useWorkout();
+  const [showCloseConfirm, setShowCloseConfirm] = useState(false);
 
   const mins = Math.floor(timeLeft / 60);
   const secs = timeLeft % 60;
