@@ -1,16 +1,45 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import { useState } from 'react';
+import Sidebar from '@/components/Sidebar';
+import { AppProvider } from '@/components/AppContext';
+import DashboardPage from '@/pages/DashboardPage';
+import WorkoutPage from '@/pages/WorkoutPage';
+import NutritionPage from '@/pages/NutritionPage';
+import CoachPage from '@/pages/CoachPage';
+import PlanPage from '@/pages/PlanPage';
+import ProfilePage from '@/pages/ProfilePage';
 
-// IMPORTANT: Fully REPLACE this with your own code
-const PlaceholderIndex = () => {
-  // PLACEHOLDER: Replace this entire return statement with the user's app.
-  // The inline background color is intentionally not part of the design system.
-  return (
-    <div className="flex min-h-screen items-center justify-center" style={{ backgroundColor: '#fcfbf8' }}>
-      <img data-lovable-blank-page-placeholder="REMOVE_THIS" src="/placeholder.svg" alt="Your app will live here!" />
-    </div>
-  );
+const pages: Record<string, React.FC> = {
+  dashboard: DashboardPage,
+  workout: WorkoutPage,
+  nutrition: NutritionPage,
+  coach: CoachPage,
+  plan: PlanPage,
+  profile: ProfilePage,
 };
 
-const Index = PlaceholderIndex;
+export default function Index() {
+  const [activePage, setActivePage] = useState('dashboard');
+  const PageComponent = pages[activePage] || DashboardPage;
 
-export default Index;
+  return (
+    <AppProvider>
+      <div className="flex h-screen overflow-hidden relative">
+        {/* Background Orbs */}
+        <div className="orb orb-gold" />
+        <div className="orb orb-teal" />
+        <div className="orb orb-purple" />
+
+        <Sidebar activePage={activePage} onNavigate={setActivePage} />
+        <main className="flex-1 overflow-y-auto p-8 relative z-10">
+          <PageComponent key={activePage} />
+          {/* Footer */}
+          <div className="text-center py-8 mt-8 border-t border-border/50">
+            <p className="text-[10px] text-muted-foreground">
+              FitGenius AI · Built by <span className="text-gold font-medium">Sai Hemanth · GVP MCA</span>
+            </p>
+          </div>
+        </main>
+      </div>
+    </AppProvider>
+  );
+}
