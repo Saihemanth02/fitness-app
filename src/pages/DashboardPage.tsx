@@ -114,7 +114,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Two Column Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-4 md:gap-6">
         {/* Left Column */}
         <div className="space-y-6">
           {/* Donut + Macros */}
