@@ -99,7 +99,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Stats Row */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4 mb-6 md:mb-8">
         {stats.map((s, i) => (
           <div key={i} className="glass-card-hover p-4">
             <div className="flex items-center gap-2 mb-2">
