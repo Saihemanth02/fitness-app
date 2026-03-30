@@ -265,19 +265,20 @@ export default function NutritionPage() {
               <Brain size={18} className="text-purple-accent" />
               <h3 className="font-display text-lg font-bold">AI Food Analyzer</h3>
             </div>
-            <input ref={fileInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFileSelect} />
-            <div onClick={() => fileInputRef.current?.click()} onDragOver={e => e.preventDefault()} onDrop={handleDrop}
-              className="border-2 border-dashed border-border rounded-xl p-6 text-center cursor-pointer hover:border-purple-accent/50 transition-colors relative overflow-hidden">
-              {previewUrl && !isProcessing && !prediction ? (
-                <img src={previewUrl} alt="Food preview" className="w-full h-32 object-cover rounded-lg mb-3" />
-              ) : !previewUrl ? (
-                <>
-                  <div className="flex justify-center gap-3 mb-3"><Upload size={28} className="text-muted-foreground" /><Camera size={28} className="text-muted-foreground" /></div>
-                  <p className="text-sm text-muted-foreground">Upload or take a food photo</p>
-                  <p className="text-[10px] text-muted-foreground mt-1">Drag & drop or click to browse</p>
-                  <p className="text-[10px] text-purple-accent mt-2">Powered by Gemini Vision AI</p>
-                </>
-              ) : null}
+            {/* Mode toggle */}
+            <div className="flex rounded-xl bg-secondary p-1 mb-4">
+              <button onClick={() => setAnalyzerMode('photo')}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition-all ${
+                  analyzerMode === 'photo' ? 'bg-purple-accent text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                }`}>
+                <Camera size={14} /> Photo
+              </button>
+              <button onClick={() => setAnalyzerMode('text')}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition-all ${
+                  analyzerMode === 'text' ? 'bg-purple-accent text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                }`}>
+                <Type size={14} /> Text
+              </button>
             </div>
             {isProcessing && (
               <div className="mt-4">
