@@ -50,11 +50,28 @@ export default function AuthPage() {
 
   const handleGoogleAuth = async () => {
     setLoading(true);
-    const { error } = await lovable.auth.signInWithOAuth('google', {
-      redirect_uri: window.location.origin,
-    });
-    if (error) {
-      setMessage({ text: (error as Error).message || 'Google sign-in failed', type: 'error' });
+    try {
+      const isLovableHost = window.location.hostname.endsWith('.lovable.app');
+      if (isLovableHost) {
+        const result = await lovable.auth.signInWithOAuth('google', {
+          redirect_uri: window.location.origin,
+        });
+        if (result.error) {
+          setMessage({ text: (result.error as Error).message || 'Google sign-in failed', type: 'error' });
+          setLoading(false);
+        }
+      } else {
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: { redirectTo: window.location.origin },
+        });
+        if (error) {
+          setMessage({ text: error.message || 'Google sign-in failed', type: 'error' });
+          setLoading(false);
+        }
+      }
+    } catch (err: any) {
+      setMessage({ text: err.message || 'Google sign-in failed', type: 'error' });
       setLoading(false);
     }
   };
